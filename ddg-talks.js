@@ -171,8 +171,206 @@ function main() {
 		);
 	}
 
+	function pixelEdgeEffect() {
+		// Pixelated metaball edge effect
+		// by Adam Kuhn - adamkuhn.net
+		// MIT License
+		const wrap = document.querySelector(".pixel-edge");
+		const canvas = document.querySelector(".pixel-edge_canvas");
+		if (!wrap || !canvas) return;
+
+		const ctx = canvas.getContext("2d");
+
+		// ====== TWEAKS ======
+		const settings = {
+			pixelSize: 24, // bigger = chunkier pixels (try 10–18)
+			blobCount: 6, // number of drifting blobs
+			blobRadius: 250, // influence radius-ish (bigger = more merging)
+			threshold: 1.5, // lower = more filled, higher = more gaps
+			speed: 1.5, // drift speed
+			color: "#2c2c2c",
+			mouseStrength: 0.2, // 0 = off; higher = more interaction
+			mouseRadius: 500,
+		};
+
+		// ====== INTERNALS ======
+		let w = 0,
+			h = 0,
+			dpr = 1;
+		let cols = 0,
+			rows = 0;
+		const blobs = [];
+		const mouse = {
+			x: -9999,
+			y: -9999, // current
+			tx: -9999,
+			ty: -9999, // target
+			alpha: 0, // 0..1 (influence on/off)
+			targetAlpha: 0,
+		};
+
+		function rand(min, max) {
+			return min + Math.random() * (max - min);
+		}
+
+		function resize() {
+			const rect = wrap.getBoundingClientRect();
+			dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+			w = Math.floor(rect.width);
+			h = Math.floor(rect.height);
+
+			canvas.width = Math.floor(w * dpr);
+			canvas.height = Math.floor(h * dpr);
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+			cols = Math.ceil(w / settings.pixelSize);
+			rows = Math.ceil(h / settings.pixelSize);
+
+			// init blobs once
+			if (!blobs.length) {
+				for (let i = 0; i < settings.blobCount; i++) {
+					blobs.push({
+						x: rand(0, w),
+						y: rand(h * 0.7, h), // spawn closer to bottom
+						vx: rand(-1, 1),
+						vy: rand(-0.6, 0.6),
+						phase: rand(0, Math.PI * 2),
+					});
+				}
+			}
+		}
+
+		function update(dt) {
+			const s = settings.speed;
+			for (const b of blobs) {
+				b.phase += dt * 0.8;
+
+				// gentle noisy drift (no library)
+				b.vx += Math.sin(b.phase) * 0.02;
+				b.vy += Math.cos(b.phase * 0.9) * 0.02;
+
+				b.x += b.vx * s * 60 * dt;
+				b.y += b.vy * s * 60 * dt;
+
+				// keep in bounds with soft bounce
+				if (b.x < -w * 0.1) {
+					b.x = -w * 0.1;
+					b.vx *= -0.9;
+				}
+				if (b.x > w * 1.1) {
+					b.x = w * 1.1;
+					b.vx *= -0.9;
+				}
+				if (b.y < -h * 0.2) {
+					b.y = -h * 0.2;
+					b.vy *= -0.9;
+				}
+				if (b.y > h * 1.2) {
+					b.y = h * 1.2;
+					b.vy *= -0.9;
+				}
+
+				// mouse interaction: repel a bit
+				if (mouse.active && settings.mouseStrength > 0) {
+					const dx = b.x - mouse.x;
+					const dy = b.y - mouse.y;
+					const dist = Math.hypot(dx, dy);
+					const r = settings.mouseRadius;
+					if (dist < r && dist > 0.001) {
+						const force = (1 - dist / r) * 0.08 * settings.mouseStrength;
+						b.vx += (dx / dist) * force;
+						b.vy += (dy / dist) * force;
+					}
+				}
+
+				// damp velocity so it doesn't explode
+				b.vx *= 0.985;
+				b.vy *= 0.985;
+			}
+			// smooth follow + smooth fade
+			const follow = 1 - Math.pow(0.001, dt); // framerate-independent
+			mouse.x += (mouse.tx - mouse.x) * follow;
+			mouse.y += (mouse.ty - mouse.y) * follow;
+
+			const fade = 1 - Math.pow(0.01, dt); // slower
+			mouse.alpha += (mouse.targetAlpha - mouse.alpha) * fade;
+		}
+
+		function fieldValue(x, y) {
+			// sum r^2 / d^2 style metaball field
+			let v = 0;
+			const r2 = settings.blobRadius * settings.blobRadius;
+
+			for (const b of blobs) {
+				const dx = x - b.x;
+				const dy = y - b.y;
+				const d2 = dx * dx + dy * dy + 0.0001;
+				v += r2 / d2;
+			}
+
+			// add a "mouse blob" to pull the surface toward cursor
+			if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
+				const dx = x - mouse.x;
+				const dy = y - mouse.y;
+				const d2 = dx * dx + dy * dy + 0.0001;
+				const mr2 =
+					settings.mouseRadius * settings.mouseRadius * settings.mouseStrength * mouse.alpha;
+				v += mr2 / d2;
+			}
+
+			return v;
+		}
+
+		function render() {
+			ctx.clearRect(0, 0, w, h);
+			ctx.fillStyle = settings.color;
+
+			const p = settings.pixelSize;
+
+			for (let gy = 0; gy < rows; gy++) {
+				const y = gy * p + p * 0.5;
+				for (let gx = 0; gx < cols; gx++) {
+					const x = gx * p + p * 0.5;
+
+					if (fieldValue(x, y) > settings.threshold) {
+						ctx.fillRect(gx * p, gy * p, p, p);
+					}
+				}
+			}
+		}
+
+		// ====== LOOP ======
+		let last = performance.now();
+		function tick(now) {
+			const dt = Math.min(0.033, (now - last) / 1000);
+			last = now;
+
+			update(dt);
+			render();
+			requestAnimationFrame(tick);
+		}
+
+		// ====== EVENTS ======
+		wrap.addEventListener("mousemove", (e) => {
+			const r = wrap.getBoundingClientRect();
+			mouse.tx = e.clientX - r.left;
+			mouse.ty = e.clientY - r.top;
+			mouse.targetAlpha = 1;
+		});
+
+		wrap.addEventListener("mouseleave", () => {
+			mouse.targetAlpha = 0;
+		});
+
+		window.addEventListener("resize", resize);
+
+		resize();
+		requestAnimationFrame(tick);
+	}
+
 	// call functions
 
 	buttonHover();
 	navOpen();
+	pixelEdgeEffect();
 }
