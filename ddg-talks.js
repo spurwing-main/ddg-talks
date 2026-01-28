@@ -4,7 +4,7 @@ function main() {
 
 		// expects GSAP loaded
 		// Apply to multiple buttons
-		document.querySelectorAll(".button").forEach((btn) => {
+		document.querySelectorAll(".button, .nav-link").forEach((btn) => {
 			const ripple = btn.querySelector(".button_ripple");
 			if (!ripple) return;
 			const rippleColor = getComputedStyle(btn).getPropertyValue("--ripple-color").trim();
@@ -182,16 +182,45 @@ function main() {
 		const ctx = canvas.getContext("2d");
 
 		// ====== TWEAKS ======
-		const settings = {
-			pixelSize: 24, // bigger = chunkier pixels (try 10–18)
+		const baseSettings = {
+			pixelSize: 50, // bigger = chunkier pixels (try 10–18)
 			blobCount: 6, // number of drifting blobs
-			blobRadius: 250, // influence radius-ish (bigger = more merging)
+			blobRadius: 200, // influence radius-ish (bigger = more merging)
 			threshold: 1.5, // lower = more filled, higher = more gaps
 			speed: 1.5, // drift speed
 			color: "#2c2c2c",
 			mouseStrength: 0.2, // 0 = off; higher = more interaction
 			mouseRadius: 500,
+			bottomBand: 0.55, // only allow blobs in bottom 55% of canvas
 		};
+		let settings = { ...baseSettings };
+
+		function applyResponsiveSettings() {
+			settings = { ...baseSettings };
+
+			// tablet and down
+			if (window.matchMedia("(max-width: 991px)").matches) {
+				settings.pixelSize = baseSettings.pixelSize * 0.8;
+				settings.blobRadius = baseSettings.blobRadius * 0.8;
+				settings.mouseRadius = baseSettings.mouseRadius * 0.8;
+			}
+
+			// mobile
+			if (window.matchMedia("(max-width: 767px)").matches) {
+				settings.pixelSize = baseSettings.pixelSize * 0.8;
+				settings.blobRadius = baseSettings.blobRadius * 0.28;
+				settings.threshold = 1.2;
+				settings.speed = 1.2;
+				settings.mouseStrength = 0.12;
+				settings.mouseRadius = baseSettings.mouseRadius * 0.72;
+				settings.bottomBand = baseSettings.bottomBand * 0.72; // keep it tighter to the bottom on small screens
+			}
+
+			// tiny phones
+			if (window.matchMedia("(max-width: 479px)").matches) {
+				settings.pixelSize = baseSettings.pixelSize * 0.64;
+			}
+		}
 
 		// ====== INTERNALS ======
 		let w = 0,
@@ -214,10 +243,13 @@ function main() {
 		}
 
 		function resize() {
+			applyResponsiveSettings();
+
 			const rect = wrap.getBoundingClientRect();
 			dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
 			w = Math.floor(rect.width);
 			h = Math.floor(rect.height);
+			const bandTop = h * (1 - settings.bottomBand);
 
 			canvas.width = Math.floor(w * dpr);
 			canvas.height = Math.floor(h * dpr);
@@ -231,7 +263,7 @@ function main() {
 				for (let i = 0; i < settings.blobCount; i++) {
 					blobs.push({
 						x: rand(0, w),
-						y: rand(h * 0.7, h), // spawn closer to bottom
+						y: rand(bandTop, h),
 						vx: rand(-1, 1),
 						vy: rand(-0.6, 0.6),
 						phase: rand(0, Math.PI * 2),
@@ -242,6 +274,9 @@ function main() {
 
 		function update(dt) {
 			const s = settings.speed;
+			const bandTop = h * (1 - settings.bottomBand);
+			const bandBottom = h * 1.15; // allow a bit below so it “merges” into next section
+
 			for (const b of blobs) {
 				b.phase += dt * 0.8;
 
@@ -270,14 +305,24 @@ function main() {
 					b.vy *= -0.9;
 				}
 
+				if (b.y < bandTop) {
+					b.y = bandTop;
+					b.vy = Math.abs(b.vy) * 0.9;
+				}
+				if (b.y > bandBottom) {
+					b.y = bandBottom;
+					b.vy = -Math.abs(b.vy) * 0.9;
+				}
+
 				// mouse interaction: repel a bit
-				if (mouse.active && settings.mouseStrength > 0) {
+				if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
 					const dx = b.x - mouse.x;
 					const dy = b.y - mouse.y;
 					const dist = Math.hypot(dx, dy);
 					const r = settings.mouseRadius;
 					if (dist < r && dist > 0.001) {
-						const force = (1 - dist / r) * 0.08 * settings.mouseStrength;
+						const force = (1 - dist / r) * 0.08 * settings.mouseStrength * mouse.alpha;
+
 						b.vx += (dx / dist) * force;
 						b.vy += (dy / dist) * force;
 					}
@@ -368,9 +413,241 @@ function main() {
 		requestAnimationFrame(tick);
 	}
 
+	function formButtonProxySubmit() {
+		const buttons = document.querySelectorAll(".form_button-wrap > .button");
+		buttons.forEach((btn) => {
+			btn.addEventListener("click", (event) => {
+				// If this is an anchor-style button, prevent navigation so the submit can happen.
+				if (btn.tagName === "A") event.preventDefault();
+
+				const formRoot = btn.closest(".form");
+				if (!formRoot) return;
+				const hiddenSubmit = formRoot.querySelector(".form_submit-hidden");
+				if (!hiddenSubmit) return;
+
+				hiddenSubmit.click();
+			});
+		});
+	}
+
+	function customSelect() {
+		const dropdowns = document.querySelectorAll('[data-custom-select="dropdown"]');
+		if (!dropdowns.length) return;
+
+		dropdowns.forEach((dropdown) => {
+			const select = dropdown.querySelector("select");
+			const defaultTextEl = dropdown.querySelector('[data-custom-select="default"]');
+			const toggleTextFallback = dropdown.querySelector(".w-dropdown-toggle > div");
+			const optionsWrap = dropdown.querySelector(".custom-select_list");
+			if (!select || !optionsWrap) return;
+
+			const placeholderText = defaultTextEl
+				? defaultTextEl.textContent.trim()
+				: toggleTextFallback
+					? toggleTextFallback.textContent.trim()
+					: "Select an option";
+
+			// Ensure a "default/reset" option exists as the first list item
+			let resetLink = optionsWrap.querySelector('[data-custom-select="reset"]');
+			if (!resetLink) {
+				resetLink = document.createElement("a");
+				resetLink.href = "#";
+				resetLink.className = "custom-select_option w-dropdown-link";
+				resetLink.setAttribute("data-custom-select", "reset");
+				resetLink.setAttribute("data-value", "");
+				resetLink.textContent = placeholderText;
+				optionsWrap.prepend(resetLink);
+			} else {
+				resetLink.textContent = placeholderText;
+				resetLink.setAttribute("data-value", "");
+			}
+
+			// Collect options (including reset)
+			const optionLinks = Array.from(
+				optionsWrap.querySelectorAll("a.custom-select_option, a.custom-select__option"),
+			);
+			if (!optionLinks.length) return;
+
+			// Build select options from list
+			const optionsData = [];
+			optionLinks.forEach((a) => {
+				const label = a.textContent.trim();
+				if (!label && a.getAttribute("data-value") !== "") return;
+				const value = (a.getAttribute("data-value") ?? label).trim();
+				optionsData.push({ value, label: label || placeholderText });
+			});
+
+			// Rebuild select
+			select.innerHTML = "";
+			optionsData.forEach(({ value, label }) => {
+				const opt = document.createElement("option");
+				opt.value = value;
+				opt.textContent = label;
+				select.appendChild(opt);
+			});
+
+			function setCurrentUI(value) {
+				const match = optionsData.find((o) => o.value === value);
+				const label = match ? match.label : placeholderText;
+
+				if (defaultTextEl) defaultTextEl.textContent = label;
+				else if (toggleTextFallback) toggleTextFallback.textContent = label;
+
+				optionLinks.forEach((a) => a.classList.remove("is-current"));
+
+				const active = optionLinks.find((a) => (a.getAttribute("data-value") || "") === value);
+				if (active) active.classList.add("is-current");
+			}
+
+			optionsWrap.addEventListener("click", (e) => {
+				const option = e.target.closest("a.custom-select_option, a.custom-select__option");
+				if (!option) return;
+				e.preventDefault();
+
+				const label = option.textContent.trim();
+				const value = (option.getAttribute("data-value") || label).trim();
+
+				select.value = value;
+				select.dispatchEvent(new Event("input", { bubbles: true }));
+				select.dispatchEvent(new Event("change", { bubbles: true }));
+
+				setCurrentUI(value);
+
+				closeDropdown(dropdown);
+			});
+
+			select.addEventListener("change", () => setCurrentUI(select.value));
+
+			// Init
+			if (!select.value) select.value = "";
+			setCurrentUI(select.value);
+		});
+
+		function closeDropdown(dropdown) {
+			// Preferred: notify Webflow dropdown component properly
+			if (window.jQuery) {
+				window.jQuery(dropdown).trigger("w-close");
+				window.jQuery(dropdown).trigger("w-close.w-dropdown");
+				return;
+			}
+
+			dropdown.classList.remove("w--open");
+
+			const toggle = dropdown.querySelector(".w-dropdown-toggle");
+			const list = dropdown.querySelector(".w-dropdown-list");
+
+			if (toggle) {
+				toggle.setAttribute("aria-expanded", "false");
+				toggle.classList.remove("w--open");
+			}
+
+			if (list) {
+				list.classList.remove("w--open");
+			}
+		}
+	}
+
+	function cards() {
+		const cards = document.querySelectorAll(".card");
+
+		cards.forEach((card, index) => {
+			const isLast = index === cards.length - 1;
+			const cardInner = card.querySelector(".card_inner");
+			const cardContent = card.querySelector(".card_content");
+
+			if (!isLast) {
+				gsap.to(cardContent, {
+					rotationZ: (Math.random() - 0.5) * 10,
+					scale: 0.7,
+					rotationX: 40,
+					ease: "power1.in",
+					scrollTrigger: {
+						pin: cardInner,
+						trigger: card,
+						start: "top top",
+						end: "+=" + window.innerHeight,
+						scrub: true,
+					},
+				});
+
+				const pinDuration = window.innerHeight;
+
+				gsap.to(cardContent, {
+					autoAlpha: 0,
+					ease: "power1.inOut",
+					scrollTrigger: {
+						trigger: card,
+						start: `top+=${pinDuration * 0.75} top`,
+						end: `top+=${pinDuration} top`,
+						scrub: true,
+					},
+				});
+			}
+		});
+	}
+
+	function faq() {
+		const items = Array.from(document.querySelectorAll(".faq_item"));
+		if (!items.length) return;
+
+		const closeItem = (item) => {
+			const bodyWrap = item.querySelector(".faq_item-body-wrap");
+			const svg = item.querySelector(".faq_item-svg");
+			if (!bodyWrap) return;
+
+			item.classList.remove("is-open");
+			gsap.killTweensOf([bodyWrap, svg].filter(Boolean));
+			gsap.to(bodyWrap, { height: 0, duration: 0.3, ease: "power3.inOut" });
+			if (svg) gsap.to(svg, { rotate: 0, duration: 0.25, ease: "power3.out" });
+		};
+
+		const openItem = (item) => {
+			const bodyWrap = item.querySelector(".faq_item-body-wrap");
+			const svg = item.querySelector(".faq_item-svg");
+			if (!bodyWrap) return;
+
+			items.forEach((other) => {
+				if (other !== item && other.classList.contains("is-open")) closeItem(other);
+			});
+
+			item.classList.add("is-open");
+			gsap.killTweensOf([bodyWrap, svg].filter(Boolean));
+			gsap.set(bodyWrap, { overflow: "hidden" });
+			gsap.to(bodyWrap, { height: "auto", duration: 0.35, ease: "power3.out" });
+			if (svg) gsap.to(svg, { rotate: 180, duration: 0.25, ease: "power3.out" });
+		};
+
+		// Initial state
+		items.forEach((item) => {
+			const header = item.querySelector(".faq_item-header");
+			const bodyWrap = item.querySelector(".faq_item-body-wrap");
+			const svg = item.querySelector(".faq_item-svg");
+			if (!header || !bodyWrap) return;
+
+			item.classList.remove("is-open");
+			gsap.set(bodyWrap, { height: 0, overflow: "hidden" });
+			if (svg) gsap.set(svg, { rotate: 0 });
+
+			header.addEventListener("click", (e) => {
+				e.preventDefault();
+				if (item.classList.contains("is-open")) closeItem(item);
+				else openItem(item);
+			});
+		});
+	}
+
+	if ("requestIdleCallback" in window) {
+		requestIdleCallback(cards);
+	} else {
+		setTimeout(cards, 500);
+	}
+
 	// call functions
 
 	buttonHover();
 	navOpen();
 	pixelEdgeEffect();
+	formButtonProxySubmit();
+	customSelect();
+	faq();
 }
