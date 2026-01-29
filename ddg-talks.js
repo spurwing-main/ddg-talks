@@ -797,8 +797,10 @@ function main() {
 	function initImpactGallery() {
 		const section = document.querySelector(".c-impact");
 		const sticky = section?.querySelector(".impact_sticky-content");
+		const content = section?.querySelector(".impact_content");
 		const imgsWrap = section?.querySelector(".impact_imgs");
 		const items = gsap.utils.toArray(".c-impact-img", imgsWrap);
+		const isMobile = () => window.innerWidth <= 767;
 
 		if (!section || !sticky || !imgsWrap || !items.length) return;
 
@@ -806,6 +808,10 @@ function main() {
 		if (section._impactST) {
 			section._impactST.kill();
 			section._impactST = null;
+		}
+		if (section._impactContentTween) {
+			section._impactContentTween.kill();
+			section._impactContentTween = null;
 		}
 		if (section._impactTickerFn) {
 			gsap.ticker.remove(section._impactTickerFn);
@@ -817,6 +823,29 @@ function main() {
 			.filter((st) => st.trigger === section)
 			.forEach((st) => st.kill());
 
+		// Mobile: do not run any of the Impact animation machinery
+		if (isMobile()) {
+			// Avoid a huge scroll-only section on mobile
+			section.style.height = "";
+
+			// Content should just be visible
+			if (content) gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
+
+			// Hide images on mobile (previous behavior), and clear any 3D styles
+			imgsWrap.style.visibility = "";
+			imgsWrap.style.transformStyle = "";
+			sticky.style.perspective = "";
+
+			items.forEach((el) => {
+				gsap.set(el, {
+					opacity: 0,
+					clearProps:
+						"filter,transform,willChange,backfaceVisibility,transformStyle,z,left,top,xPercent,yPercent",
+				});
+			});
+			return;
+		}
+
 		imgsWrap.style.visibility = "hidden";
 
 		// perspective: good
@@ -824,7 +853,6 @@ function main() {
 		imgsWrap.style.transformStyle = "preserve-3d";
 
 		const clamp01 = gsap.utils.clamp(0, 1);
-		const isMobile = () => window.innerWidth <= 600;
 
 		function biasedPosition(el, { sideBias, minGutter, centerExclusion, topPad, bottomPad } = {}) {
 			const vw = window.innerWidth;
@@ -867,7 +895,28 @@ function main() {
 			const total = totalScrollPx();
 			section.style.height = `${Math.ceil(((total + vh()) / vh()) * 100)}vh`;
 		};
-		setSectionHeight();
+		if (!isMobile()) setSectionHeight();
+
+		// --- impact content fade-in (scrubbed) ---
+		if (content) {
+			if (isMobile()) {
+				gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
+			} else {
+				gsap.set(content, { opacity: 0, y: 10, willChange: "opacity, transform" });
+				section._impactContentTween = gsap.to(content, {
+					opacity: 1,
+					y: 0,
+					ease: "none",
+					scrollTrigger: {
+						trigger: section,
+						start: () => `top+=${Math.round(totalScrollPx() * 0.25)} top`,
+						end: () => `top+=${Math.round(totalScrollPx() * 0.45)} top`,
+						scrub: true,
+						invalidateOnRefresh: true,
+					},
+				});
+			}
+		}
 
 		// --- layout + baseline (no transform strings) ---
 		items.forEach((el) => {
