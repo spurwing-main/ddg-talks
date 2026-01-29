@@ -636,6 +636,164 @@ function main() {
 		});
 	}
 
+	function carousel() {
+		if (typeof gsap === "undefined") return;
+
+		const sliders = Array.from(document.querySelectorAll(".timeline_slider"));
+		if (!sliders.length) return;
+
+		sliders.forEach((slider) => {
+			const list = slider.querySelector(".timeline-slider_list");
+			const slides = Array.from(slider.querySelectorAll(".timeline-slider_slide"));
+			if (!slides.length) return;
+
+			const refreshScrollTriggers = () => {
+				if (typeof ScrollTrigger === "undefined") return;
+				requestAnimationFrame(() => ScrollTrigger.refresh());
+			};
+
+			const prevBtn = slider.querySelector(".timeline_slider-button.is-prev");
+			const nextBtn = slider.querySelector(".timeline_slider-button.is-next");
+			const pagination = slider.querySelector(".timeline_slider-pagination");
+			if (!prevBtn || !nextBtn || !pagination) return;
+
+			const total = slides.length;
+			let currentIndex = 0;
+			let isAnimating = false;
+
+			const updateControls = () => {
+				prevBtn.disabled = currentIndex === 0;
+				nextBtn.disabled = currentIndex === total - 1;
+				prevBtn.setAttribute("aria-disabled", String(prevBtn.disabled));
+				nextBtn.setAttribute("aria-disabled", String(nextBtn.disabled));
+				pagination.innerText = `${currentIndex + 1}/${total}`;
+			};
+
+			const setActiveSlide = (index) => {
+				currentIndex = Math.min(Math.max(index, 0), total - 1);
+				slides.forEach((slide, idx) => {
+					const isActive = idx === currentIndex;
+					slide.hidden = !isActive;
+					slide.setAttribute("aria-hidden", String(!isActive));
+					gsap.set(slide, {
+						autoAlpha: isActive ? 1 : 0,
+						pointerEvents: isActive ? "auto" : "none",
+					});
+					if (isActive) gsap.set(slide, { clearProps: "position,top,left,width" });
+				});
+
+				if (list) {
+					gsap.set(list, { position: "relative", overflow: "hidden", height: "auto" });
+				}
+				updateControls();
+			};
+
+			const transitionTo = (nextIndex) => {
+				const targetIndex = Math.min(Math.max(nextIndex, 0), total - 1);
+				if (isAnimating) return;
+				if (targetIndex === currentIndex) return;
+
+				const currentSlide = slides[currentIndex];
+				const nextSlide = slides[targetIndex];
+				if (!currentSlide || !nextSlide) return;
+				if (!list) {
+					setActiveSlide(targetIndex);
+					return;
+				}
+
+				isAnimating = true;
+
+				// Measure current slide height (list is already at auto)
+				const currentHeight = currentSlide.offsetHeight;
+
+				// Prep next slide for measuring + fade-in
+				nextSlide.hidden = false;
+				nextSlide.setAttribute("aria-hidden", "false");
+				gsap.set(nextSlide, {
+					position: "absolute",
+					top: 0,
+					left: 0,
+					width: "100%",
+					autoAlpha: 0,
+					pointerEvents: "none",
+				});
+
+				const nextHeight = nextSlide.offsetHeight;
+				gsap.set(list, { height: currentHeight });
+
+				// Update index/pagination immediately so UI feels responsive
+				currentIndex = targetIndex;
+				updateControls();
+
+				gsap
+					.timeline({
+						defaults: { ease: "power2.out" },
+						onComplete: () => {
+							// Hide old slides, keep only active visible
+							slides.forEach((slide, idx) => {
+								const isActive = idx === currentIndex;
+								slide.hidden = !isActive;
+								slide.setAttribute("aria-hidden", String(!isActive));
+								gsap.set(slide, {
+									autoAlpha: isActive ? 1 : 0,
+									pointerEvents: isActive ? "auto" : "none",
+								});
+							});
+
+							// Reset positioning on the now-active slide
+							gsap.set(nextSlide, { clearProps: "position,top,left,width,pointerEvents" });
+							gsap.set(list, { height: "auto", clearProps: "overflow" });
+							isAnimating = false;
+							refreshScrollTriggers();
+						},
+					})
+					.to(list, { height: nextHeight, duration: 0.35 }, 0)
+					.to(currentSlide, { autoAlpha: 0, duration: 0.2 }, 0)
+					.to(nextSlide, { autoAlpha: 1, duration: 0.25 }, 0.08);
+			};
+
+			// init
+			setActiveSlide(0);
+
+			prevBtn.addEventListener("click", (e) => {
+				e.preventDefault();
+				if (prevBtn.disabled) return;
+				transitionTo(currentIndex - 1);
+			});
+
+			nextBtn.addEventListener("click", (e) => {
+				e.preventDefault();
+				if (nextBtn.disabled) return;
+				transitionTo(currentIndex + 1);
+			});
+		});
+	}
+
+	function cardsTitleColorScroll() {
+		if (typeof gsap === "undefined" || typeof ScrollTrigger === "undefined") return;
+
+		const titles = Array.from(document.querySelectorAll(".c-cards h2.section-title"));
+		if (!titles.length) return;
+
+		const centres = Array.from(document.querySelectorAll(".timeline_center, .timeline_centre"));
+		const lastCentre = centres[centres.length - 1];
+		if (!lastCentre) return;
+
+		const tween = gsap.to(titles, {
+			color: "#9887ff",
+			duration: 0.75,
+			ease: "power2.out",
+			paused: true,
+		});
+
+		ScrollTrigger.create({
+			trigger: lastCentre,
+			start: "bottom center",
+			onEnter: () => tween.play(),
+			onLeaveBack: () => tween.reverse(),
+		});
+	}
+
 	if ("requestIdleCallback" in window) {
 		requestIdleCallback(cards);
 	} else {
@@ -650,4 +808,6 @@ function main() {
 	formButtonProxySubmit();
 	customSelect();
 	faq();
+	carousel();
+	cardsTitleColorScroll();
 }
