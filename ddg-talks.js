@@ -875,8 +875,8 @@ function main() {
 				sideBias: 0.5,
 				minGutter: 32,
 				centerExclusion: 0.35,
-				topPad: 22,
-				bottomPad: 38,
+				topPad: 50,
+				bottomPad: 75,
 			});
 
 			gsap.set(el, {
