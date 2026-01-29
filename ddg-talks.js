@@ -794,6 +794,196 @@ function main() {
 		});
 	}
 
+	function initImpactGallery() {
+		const section = document.querySelector(".c-impact");
+		const sticky = section?.querySelector(".impact_sticky-content");
+		const imgsWrap = section?.querySelector(".impact_imgs");
+		const items = gsap.utils.toArray(".c-impact-img", imgsWrap);
+
+		if (!section || !sticky || !imgsWrap || !items.length) return;
+
+		// --- cleanup: kill old ST + ticker fn (prevents stacking) ---
+		if (section._impactST) {
+			section._impactST.kill();
+			section._impactST = null;
+		}
+		if (section._impactTickerFn) {
+			gsap.ticker.remove(section._impactTickerFn);
+			section._impactTickerFn = null;
+		}
+
+		// also kill any stray triggers tied to this section (optional safety)
+		ScrollTrigger.getAll()
+			.filter((st) => st.trigger === section)
+			.forEach((st) => st.kill());
+
+		imgsWrap.style.visibility = "hidden";
+
+		// perspective: good
+		sticky.style.perspective = `${Math.round(window.innerWidth * 0.9)}px`;
+		imgsWrap.style.transformStyle = "preserve-3d";
+
+		const clamp01 = gsap.utils.clamp(0, 1);
+		const isMobile = () => window.innerWidth <= 600;
+
+		function biasedPosition(el, { sideBias, minGutter, centerExclusion, topPad, bottomPad } = {}) {
+			const vw = window.innerWidth;
+			const rect = el.getBoundingClientRect();
+			const w = rect.width || 260;
+
+			const xMin = minGutter + w * 0.5;
+			const xMax = vw - minGutter - w * 0.5;
+
+			const cx = vw * 0.5;
+			const halfDead = vw * centerExclusion * 0.5;
+
+			const leftBand = [xMin, Math.max(xMin, cx - halfDead)];
+			const rightBand = [Math.min(xMax, cx + halfDead), xMax];
+
+			const pickRight = Math.random() < sideBias;
+			let band = pickRight ? rightBand : leftBand;
+			if (band[1] - band[0] < 20) band = [xMin, xMax];
+
+			const xPx = gsap.utils.random(band[0], band[1], 1);
+			const yPct = gsap.utils.random(topPad, 100 - bottomPad, 1);
+
+			return {
+				left: `${(xPx / vw) * 100}%`,
+				top: `${yPct}%`,
+			};
+		}
+
+		// --- TIMING MODEL ---
+		const vh = () => window.innerHeight;
+
+		const stepPx = () => vh() * 0.5;
+		const winPx = () => vh() * 1.25;
+		const leadIn = () => vh() * 0.25;
+		const tailOut = () => vh() * 0.25;
+
+		const totalScrollPx = () => leadIn() + (items.length - 1) * stepPx() + winPx() + tailOut();
+
+		const setSectionHeight = () => {
+			const total = totalScrollPx();
+			section.style.height = `${Math.ceil(((total + vh()) / vh()) * 100)}vh`;
+		};
+		setSectionHeight();
+
+		// --- layout + baseline (no transform strings) ---
+		items.forEach((el) => {
+			const pos = biasedPosition(el, {
+				sideBias: 0.5,
+				minGutter: 32,
+				centerExclusion: 0.35,
+				topPad: 22,
+				bottomPad: 38,
+			});
+
+			gsap.set(el, {
+				left: pos.left,
+				top: pos.top,
+				xPercent: -50,
+				yPercent: -50,
+				opacity: 0,
+				filter: "blur(20px)",
+				transformStyle: "preserve-3d",
+				backfaceVisibility: "hidden",
+				willChange: "transform, opacity, filter",
+				z: -300, // in vh units we’ll treat as vh later; you can switch to px if you want
+			});
+		});
+
+		// --- quickSetters (components, NOT full transform) ---
+		const setters = items.map((el) => ({
+			z: gsap.quickSetter(el, "z", "vh"), // sets translateZ(...) in vh units
+			opacity: gsap.quickSetter(el, "opacity"),
+			blur: (px) => (el.style.filter = `blur(${px}px)`),
+		}));
+
+		function render(t) {
+			const fadeInP = 0.35;
+			const fadeOutP = 0.25;
+
+			items.forEach((el, i) => {
+				const start = leadIn() + i * stepPx();
+				const u = (t - start) / winPx();
+				const p = clamp01(u);
+
+				// outside its window -> hard hidden
+				if (u <= 0 || u >= 1) {
+					setters[i].opacity(0);
+					setters[i].blur(20);
+					setters[i].z(-300);
+					return;
+				}
+
+				let alpha;
+				if (p < fadeInP) alpha = p / fadeInP;
+				else if (p > 1 - fadeOutP) alpha = (1 - p) / fadeOutP;
+				else alpha = 1;
+
+				const blurPx = 20 * (1 - alpha);
+				const zVh = -300 + 500 * p;
+
+				setters[i].opacity(alpha);
+				setters[i].blur(blurPx);
+				setters[i].z(zVh);
+			});
+		}
+
+		// --- ScrollTrigger (raw) ---
+		const st = ScrollTrigger.create({
+			trigger: section,
+			start: "top top",
+			end: () => "+=" + totalScrollPx(),
+			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
+			invalidateOnRefresh: true,
+			onRefresh: setSectionHeight,
+		});
+		section._impactST = st;
+
+		// --- manual scrub via ticker (store fn so we can remove it) ---
+		let smoothedT = 0;
+		const scrubSeconds = 0.2; // 0.2 is quite “snappy”; try 0.6–1.2 for smoother
+
+		section._impactTickerFn = () => {
+			if (!section._impactST) return;
+			if (isMobile()) {
+				items.forEach((el) => (el.style.opacity = "0"));
+				return;
+			}
+
+			const rawT = section._impactST.scroll() - section._impactST.start;
+
+			const dt = gsap.ticker.deltaRatio() / 60;
+			const k = 1 - Math.exp(-dt / scrubSeconds);
+			smoothedT += (rawT - smoothedT) * k;
+
+			render(smoothedT);
+		};
+
+		gsap.ticker.add(section._impactTickerFn);
+
+		// first paint
+		render(0);
+		ScrollTrigger.refresh();
+		imgsWrap.style.visibility = "";
+	}
+
+	// Run after load so image sizes exist for safe positioning
+	window.addEventListener("load", initImpactGallery);
+
+	function randomImgSrc() {
+		const impactImgs = document.querySelectorAll(".c-impact-img > img");
+		impactImgs.forEach((img, index) => {
+			img.src = `https://picsum.photos/600/600.webp?random=${Math.random() * 1000 + index}`;
+		});
+	}
+
+	// run once, and again on resize (debounced)
+	initImpactGallery();
+	// window.addEventListener("resize", gsap.utils.debounce(initImpactGallery, 250));
+
 	if ("requestIdleCallback" in window) {
 		requestIdleCallback(cards);
 	} else {
@@ -802,6 +992,7 @@ function main() {
 
 	// call functions
 
+	randomImgSrc();
 	buttonHover();
 	navOpen();
 	pixelEdgeEffect();
