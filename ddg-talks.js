@@ -856,8 +856,8 @@ function main() {
 		// --- TIMING MODEL ---
 		const vh = () => window.innerHeight;
 
-		const stepPx = () => vh() * 0.5;
-		const winPx = () => vh() * 1.25;
+		const stepPx = () => vh() * 0.35;
+		const winPx = () => vh() * 1.5;
 		const leadIn = () => vh() * 0.25;
 		const tailOut = () => vh() * 0.25;
 
