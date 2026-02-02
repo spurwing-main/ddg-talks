@@ -4,7 +4,7 @@ function main() {
 
 		// expects GSAP loaded
 		// Apply to multiple buttons
-		document.querySelectorAll(".button, .nav-link").forEach((btn) => {
+		document.querySelectorAll(".button, .nav-link, .timeline_slider-button").forEach((btn) => {
 			const ripple = btn.querySelector(".button_ripple");
 			if (!ripple) return;
 			const rippleColor = getComputedStyle(btn).getPropertyValue("--ripple-color").trim();
@@ -36,6 +36,7 @@ function main() {
 			const yTo = gsap.quickTo(ripple, "y", { duration: 0.2, ease: "power3.out" });
 
 			btn.addEventListener("pointerenter", (e) => {
+				console.log("button pointerenter");
 				const { x, y, w, h } = setPos(e);
 				setSizeForCover(x, y, w, h);
 
