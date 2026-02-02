@@ -684,7 +684,7 @@ function main() {
 				});
 
 				if (list) {
-					gsap.set(list, { position: "relative", overflow: "hidden", height: "auto" });
+					gsap.set(list, { position: "relative", height: "auto" });
 				}
 				updateControls();
 			};
@@ -743,7 +743,7 @@ function main() {
 
 							// Reset positioning on the now-active slide
 							gsap.set(nextSlide, { clearProps: "position,top,left,width,pointerEvents" });
-							gsap.set(list, { height: "auto", clearProps: "overflow" });
+							gsap.set(list, { height: "auto" });
 							isAnimating = false;
 							refreshScrollTriggers();
 						},
