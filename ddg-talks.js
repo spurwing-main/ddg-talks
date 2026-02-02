@@ -742,8 +742,8 @@ function main() {
 							});
 
 							// Reset positioning on the now-active slide
-							gsap.set(nextSlide, { clearProps: "position,top,left,width,pointerEvents" });
-							gsap.set(list, { height: "auto" });
+							// gsap.set(nextSlide, { clearProps: "position,top,left,width,pointerEvents" });
+							// gsap.set(list, { height: "auto" });
 							isAnimating = false;
 							refreshScrollTriggers();
 						},
