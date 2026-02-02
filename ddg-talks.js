@@ -67,13 +67,13 @@ function main() {
 	}
 
 	function navOpen() {
-		const navButton = document.querySelector(".nav_outer.is-right .button"); // on desktop this acts as a CTA link, on mobile we use it to open the nav
+		const navButton = document.querySelector(".nav_btn-wrap.is-mbl .button"); // on desktop this acts as a CTA link, on mobile we use it to open the nav
 		const navMenu = document.querySelector(".nav_menu");
 		const navMenuWrap = document.querySelector(".nav_menu-wrap");
 		const navIcon = navButton ? navButton.querySelector(".button_icon") : null;
 		const nav = document.querySelector(".nav");
 
-		const navLinks = navMenu ? navMenu.querySelectorAll(".nav_menu-link") : null;
+		const navLinks = navMenu ? navMenu.querySelectorAll(".nav-link ") : null;
 		if (!navButton || !navMenuWrap || !navMenu || !navLinks) return;
 
 		let isOpen = false;
