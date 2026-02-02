@@ -186,13 +186,13 @@ function main() {
 		const baseSettings = {
 			pixelSize: 50, // bigger = chunkier pixels (try 10–18)
 			blobCount: 6, // number of drifting blobs
-			blobRadius: 200, // influence radius-ish (bigger = more merging)
+			blobRadius: 85, // influence radius-ish (bigger = more merging)
 			threshold: 1.5, // lower = more filled, higher = more gaps
 			speed: 1.5, // drift speed
 			color: "#2c2c2c",
 			mouseStrength: 0.2, // 0 = off; higher = more interaction
-			mouseRadius: 500,
-			bottomBand: 0.55, // only allow blobs in bottom 55% of canvas
+			mouseRadius: 300,
+			bottomBand: 0.35, // only allow blobs in bottom 55% of canvas
 		};
 		let settings = { ...baseSettings };
 
@@ -797,37 +797,38 @@ function main() {
 
 	function initImpactGallery() {
 		const section = document.querySelector(".c-impact");
+		const scroller = section?.querySelector(".impact_scroll");
 		const sticky = section?.querySelector(".impact_sticky-content");
 		const content = section?.querySelector(".impact_content");
 		const imgsWrap = section?.querySelector(".impact_imgs");
 		const items = gsap.utils.toArray(".c-impact-img", imgsWrap);
 		const isMobile = () => window.innerWidth <= 767;
 
-		if (!section || !sticky || !imgsWrap || !items.length) return;
+		if (!scroller || !sticky || !imgsWrap || !items.length) return;
 
 		// --- cleanup: kill old ST + ticker fn (prevents stacking) ---
-		if (section._impactST) {
-			section._impactST.kill();
-			section._impactST = null;
+		if (scroller._impactST) {
+			scroller._impactST.kill();
+			scroller._impactST = null;
 		}
-		if (section._impactContentTween) {
-			section._impactContentTween.kill();
-			section._impactContentTween = null;
+		if (scroller._impactContentTween) {
+			scroller._impactContentTween.kill();
+			scroller._impactContentTween = null;
 		}
-		if (section._impactTickerFn) {
-			gsap.ticker.remove(section._impactTickerFn);
-			section._impactTickerFn = null;
+		if (scroller._impactTickerFn) {
+			gsap.ticker.remove(scroller._impactTickerFn);
+			scroller._impactTickerFn = null;
 		}
 
 		// also kill any stray triggers tied to this section (optional safety)
 		ScrollTrigger.getAll()
-			.filter((st) => st.trigger === section)
+			.filter((st) => st.trigger === scroller)
 			.forEach((st) => st.kill());
 
 		// Mobile: do not run any of the Impact animation machinery
 		if (isMobile()) {
 			// Avoid a huge scroll-only section on mobile
-			section.style.height = "";
+			scroller.style.height = "";
 
 			// Content should just be visible
 			if (content) gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
@@ -892,11 +893,11 @@ function main() {
 
 		const totalScrollPx = () => leadIn() + (items.length - 1) * stepPx() + winPx() + tailOut();
 
-		const setSectionHeight = () => {
+		const setScrollerHeight = () => {
 			const total = totalScrollPx();
-			section.style.height = `${Math.ceil(((total + vh()) / vh()) * 100)}vh`;
+			scroller.style.height = `${Math.ceil(((total + vh()) / vh()) * 100)}vh`;
 		};
-		if (!isMobile()) setSectionHeight();
+		if (!isMobile()) setScrollerHeight();
 
 		// --- impact content fade-in (scrubbed) ---
 		if (content) {
@@ -904,12 +905,12 @@ function main() {
 				gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
 			} else {
 				gsap.set(content, { opacity: 0, y: 10, willChange: "opacity, transform" });
-				section._impactContentTween = gsap.to(content, {
+				scroller._impactContentTween = gsap.to(content, {
 					opacity: 1,
 					y: 0,
 					ease: "none",
 					scrollTrigger: {
-						trigger: section,
+						trigger: scroller,
 						start: () => `top+=${Math.round(totalScrollPx() * 0.25)} top`,
 						end: () => `top+=${Math.round(totalScrollPx() * 0.45)} top`,
 						scrub: true,
@@ -983,27 +984,27 @@ function main() {
 
 		// --- ScrollTrigger (raw) ---
 		const st = ScrollTrigger.create({
-			trigger: section,
+			trigger: scroller,
 			start: "top top",
 			end: () => "+=" + totalScrollPx(),
 			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
 			invalidateOnRefresh: true,
-			onRefresh: setSectionHeight,
+			onRefresh: setScrollerHeight,
 		});
-		section._impactST = st;
+		scroller._impactST = st;
 
 		// --- manual scrub via ticker (store fn so we can remove it) ---
 		let smoothedT = 0;
 		const scrubSeconds = 0.2; // 0.2 is quite “snappy”; try 0.6–1.2 for smoother
 
-		section._impactTickerFn = () => {
-			if (!section._impactST) return;
+		scroller._impactTickerFn = () => {
+			if (!scroller._impactST) return;
 			if (isMobile()) {
 				items.forEach((el) => (el.style.opacity = "0"));
 				return;
 			}
 
-			const rawT = section._impactST.scroll() - section._impactST.start;
+			const rawT = scroller._impactST.scroll() - scroller._impactST.start;
 
 			const dt = gsap.ticker.deltaRatio() / 60;
 			const k = 1 - Math.exp(-dt / scrubSeconds);
@@ -1012,7 +1013,7 @@ function main() {
 			render(smoothedT);
 		};
 
-		gsap.ticker.add(section._impactTickerFn);
+		gsap.ticker.add(scroller._impactTickerFn);
 
 		// first paint
 		render(0);
