@@ -172,246 +172,717 @@ function main() {
 		);
 	}
 
-	function pixelEdgeEffect() {
-		// Pixelated metaball edge effect
-		// by Adam Kuhn - adamkuhn.net
-		// MIT License
-		const wrap = document.querySelector(".pixel-edge");
-		const canvas = document.querySelector(".pixel-edge_canvas");
-		if (!wrap || !canvas) return;
+	// function pixelEdgeEffect() {
+	// 	// Pixelated metaball edge effect
+	// 	// by Adam Kuhn - adamkuhn.net
+	// 	// MIT License
+	// 	const wrap = document.querySelector(".pixel-edge");
+	// 	const canvas = document.querySelector(".pixel-edge_canvas");
+	// 	if (!wrap || !canvas) return;
 
-		const ctx = canvas.getContext("2d");
+	// 	const ctx = canvas.getContext("2d");
 
-		// ====== TWEAKS ======
-		const baseSettings = {
-			pixelSize: 50, // bigger = chunkier pixels (try 10–18)
-			blobCount: 6, // number of drifting blobs
-			blobRadius: 85, // influence radius-ish (bigger = more merging)
-			threshold: 1.5, // lower = more filled, higher = more gaps
-			speed: 1.5, // drift speed
-			color: "#2c2c2c",
-			mouseStrength: 0.2, // 0 = off; higher = more interaction
-			mouseRadius: 300,
-			bottomBand: 0.35, // only allow blobs in bottom 55% of canvas
-		};
-		let settings = { ...baseSettings };
+	// 	// ====== TWEAKS ======
+	// 	const baseSettings = {
+	// 		pixelSize: 50, // bigger = chunkier pixels (try 10–18)
+	// 		blobCount: 6, // number of drifting blobs
+	// 		blobRadius: 85, // influence radius-ish (bigger = more merging)
+	// 		threshold: 1.5, // lower = more filled, higher = more gaps
+	// 		speed: 1.5, // drift speed
+	// 		color: "#2c2c2c",
+	// 		mouseStrength: 0.2, // 0 = off; higher = more interaction
+	// 		mouseRadius: 300,
+	// 		bottomBand: 0.35, // only allow blobs in bottom 55% of canvas
+	// 	};
+	// 	let settings = { ...baseSettings };
 
-		function applyResponsiveSettings() {
-			settings = { ...baseSettings };
+	// 	function applyResponsiveSettings() {
+	// 		settings = { ...baseSettings };
 
-			// tablet and down
-			if (window.matchMedia("(max-width: 991px)").matches) {
-				settings.pixelSize = baseSettings.pixelSize * 0.8;
-				settings.blobRadius = baseSettings.blobRadius * 0.8;
-				settings.mouseRadius = baseSettings.mouseRadius * 0.8;
+	// 		// tablet and down
+	// 		if (window.matchMedia("(max-width: 991px)").matches) {
+	// 			settings.pixelSize = baseSettings.pixelSize * 0.8;
+	// 			settings.blobRadius = baseSettings.blobRadius * 0.8;
+	// 			settings.mouseRadius = baseSettings.mouseRadius * 0.8;
+	// 		}
+
+	// 		// mobile
+	// 		if (window.matchMedia("(max-width: 767px)").matches) {
+	// 			settings.pixelSize = baseSettings.pixelSize * 0.8;
+	// 			settings.blobRadius = baseSettings.blobRadius * 0.28;
+	// 			settings.threshold = 1.2;
+	// 			settings.speed = 1.2;
+	// 			settings.mouseStrength = 0.12;
+	// 			settings.mouseRadius = baseSettings.mouseRadius * 0.72;
+	// 			settings.bottomBand = baseSettings.bottomBand * 0.72; // keep it tighter to the bottom on small screens
+	// 		}
+
+	// 		// tiny phones
+	// 		if (window.matchMedia("(max-width: 479px)").matches) {
+	// 			settings.pixelSize = baseSettings.pixelSize * 0.64;
+	// 		}
+	// 	}
+
+	// 	// ====== INTERNALS ======
+	// 	let w = 0,
+	// 		h = 0,
+	// 		dpr = 1;
+	// 	let cols = 0,
+	// 		rows = 0;
+	// 	const blobs = [];
+	// 	const mouse = {
+	// 		x: -9999,
+	// 		y: -9999, // current
+	// 		tx: -9999,
+	// 		ty: -9999, // target
+	// 		alpha: 0, // 0..1 (influence on/off)
+	// 		targetAlpha: 0,
+	// 	};
+
+	// 	function rand(min, max) {
+	// 		return min + Math.random() * (max - min);
+	// 	}
+
+	// 	function resize() {
+	// 		applyResponsiveSettings();
+
+	// 		const rect = wrap.getBoundingClientRect();
+	// 		dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+	// 		w = Math.floor(rect.width);
+	// 		h = Math.floor(rect.height);
+	// 		const bandTop = h * (1 - settings.bottomBand);
+
+	// 		canvas.width = Math.floor(w * dpr);
+	// 		canvas.height = Math.floor(h * dpr);
+	// 		ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+	// 		cols = Math.ceil(w / settings.pixelSize);
+	// 		rows = Math.ceil(h / settings.pixelSize);
+
+	// 		// init blobs once
+	// 		if (!blobs.length) {
+	// 			for (let i = 0; i < settings.blobCount; i++) {
+	// 				blobs.push({
+	// 					x: rand(0, w),
+	// 					y: rand(bandTop, h),
+	// 					vx: rand(-1, 1),
+	// 					vy: rand(-0.6, 0.6),
+	// 					phase: rand(0, Math.PI * 2),
+	// 				});
+	// 			}
+	// 		}
+	// 	}
+
+	// 	function update(dt) {
+	// 		const s = settings.speed;
+	// 		const bandTop = h * (1 - settings.bottomBand);
+	// 		const bandBottom = h * 1.15; // allow a bit below so it “merges” into next section
+
+	// 		for (const b of blobs) {
+	// 			b.phase += dt * 0.8;
+
+	// 			// gentle noisy drift (no library)
+	// 			b.vx += Math.sin(b.phase) * 0.02;
+	// 			b.vy += Math.cos(b.phase * 0.9) * 0.02;
+
+	// 			b.x += b.vx * s * 60 * dt;
+	// 			b.y += b.vy * s * 60 * dt;
+
+	// 			// keep in bounds with soft bounce
+	// 			if (b.x < -w * 0.1) {
+	// 				b.x = -w * 0.1;
+	// 				b.vx *= -0.9;
+	// 			}
+	// 			if (b.x > w * 1.1) {
+	// 				b.x = w * 1.1;
+	// 				b.vx *= -0.9;
+	// 			}
+	// 			if (b.y < -h * 0.2) {
+	// 				b.y = -h * 0.2;
+	// 				b.vy *= -0.9;
+	// 			}
+	// 			if (b.y > h * 1.2) {
+	// 				b.y = h * 1.2;
+	// 				b.vy *= -0.9;
+	// 			}
+
+	// 			if (b.y < bandTop) {
+	// 				b.y = bandTop;
+	// 				b.vy = Math.abs(b.vy) * 0.9;
+	// 			}
+	// 			if (b.y > bandBottom) {
+	// 				b.y = bandBottom;
+	// 				b.vy = -Math.abs(b.vy) * 0.9;
+	// 			}
+
+	// 			// mouse interaction: repel a bit
+	// 			if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
+	// 				const dx = b.x - mouse.x;
+	// 				const dy = b.y - mouse.y;
+	// 				const dist = Math.hypot(dx, dy);
+	// 				const r = settings.mouseRadius;
+	// 				if (dist < r && dist > 0.001) {
+	// 					const force = (1 - dist / r) * 0.08 * settings.mouseStrength * mouse.alpha;
+
+	// 					b.vx += (dx / dist) * force;
+	// 					b.vy += (dy / dist) * force;
+	// 				}
+	// 			}
+
+	// 			// damp velocity so it doesn't explode
+	// 			b.vx *= 0.985;
+	// 			b.vy *= 0.985;
+	// 		}
+	// 		// smooth follow + smooth fade
+	// 		const follow = 1 - Math.pow(0.001, dt); // framerate-independent
+	// 		mouse.x += (mouse.tx - mouse.x) * follow;
+	// 		mouse.y += (mouse.ty - mouse.y) * follow;
+
+	// 		const fade = 1 - Math.pow(0.01, dt); // slower
+	// 		mouse.alpha += (mouse.targetAlpha - mouse.alpha) * fade;
+	// 	}
+
+	// 	function fieldValue(x, y) {
+	// 		// sum r^2 / d^2 style metaball field
+	// 		let v = 0;
+	// 		const r2 = settings.blobRadius * settings.blobRadius;
+
+	// 		for (const b of blobs) {
+	// 			const dx = x - b.x;
+	// 			const dy = y - b.y;
+	// 			const d2 = dx * dx + dy * dy + 0.0001;
+	// 			v += r2 / d2;
+	// 		}
+
+	// 		// add a "mouse blob" to pull the surface toward cursor
+	// 		if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
+	// 			const dx = x - mouse.x;
+	// 			const dy = y - mouse.y;
+	// 			const d2 = dx * dx + dy * dy + 0.0001;
+	// 			const mr2 =
+	// 				settings.mouseRadius * settings.mouseRadius * settings.mouseStrength * mouse.alpha;
+	// 			v += mr2 / d2;
+	// 		}
+
+	// 		return v;
+	// 	}
+
+	// 	function render() {
+	// 		ctx.clearRect(0, 0, w, h);
+	// 		ctx.fillStyle = settings.color;
+
+	// 		const p = settings.pixelSize;
+
+	// 		for (let gy = 0; gy < rows; gy++) {
+	// 			const y = gy * p + p * 0.5;
+	// 			for (let gx = 0; gx < cols; gx++) {
+	// 				const x = gx * p + p * 0.5;
+
+	// 				if (fieldValue(x, y) > settings.threshold) {
+	// 					ctx.fillRect(gx * p, gy * p, p, p);
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+
+	// 	// ====== LOOP ======
+	// 	let last = performance.now();
+	// 	function tick(now) {
+	// 		const dt = Math.min(0.033, (now - last) / 1000);
+	// 		last = now;
+
+	// 		update(dt);
+	// 		render();
+	// 		requestAnimationFrame(tick);
+	// 	}
+
+	// 	// ====== EVENTS ======
+	// 	wrap.addEventListener("mousemove", (e) => {
+	// 		const r = wrap.getBoundingClientRect();
+	// 		mouse.tx = e.clientX - r.left;
+	// 		mouse.ty = e.clientY - r.top;
+	// 		mouse.targetAlpha = 1;
+	// 	});
+
+	// 	wrap.addEventListener("mouseleave", () => {
+	// 		mouse.targetAlpha = 0;
+	// 	});
+
+	// 	window.addEventListener("resize", resize);
+
+	// 	resize();
+	// 	requestAnimationFrame(tick);
+	// }
+
+	function newPixelEffect() {
+		(() => {
+			/**
+			 * PixelDivider — responsive modes
+			 *
+			 * Mode A (Desktop): Interactive erase (1 block) on cursor movement.
+			 * Mode B (Tablet and below): No cursor interaction; wave scrolls endlessly.
+			 *
+			 * Mobile wave shape: moundy + more varied (still smooth).
+			 * Animation direction: RIGHT → LEFT.
+			 */
+
+			// =========================================================
+			// CONTROLS
+			// =========================================================
+			const CONTROLS = {
+				DEBUG_LOGS: true,
+				HOST_SELECTOR: "#pixel-divider",
+
+				// Webflow Tablet starts at 991px (Desktop is > 991)
+				DISABLE_INTERACTION_AT_AND_BELOW_PX: 991,
+
+				// Grid / sizing
+				BLOCK_SIZE_REM: 2, // 1 block = 2rem
+				BAND_HEIGHT_BLOCKS: 7, // band height in blocks
+				WAVE_MIN_HEIGHT_BLOCKS: 0, // 0 allows dips; set 1 for always-charcoal baseline
+
+				// Desktop wave shape (two-wave blend)
+				WAVE_DESKTOP: {
+					CYCLES_1_RANGE: [1.0, 2.4],
+					CYCLES_2_RANGE: [2.0, 4.4],
+					AMP_1_RANGE: [0.45, 0.85],
+					AMP_2_RANGE: [0.1, 0.35],
+					NOISE_AMOUNT_RANGE: [0.03, 0.12],
+					NOISE_SCALE_X: 0.12,
+					MAX_FLAT_RUN_BLOCKS: 20,
+				},
+
+				// Tablet/Mobile wave shape (moundy + varied)
+				WAVE_MOBILE: {
+					// Main mound (wide)
+					CYCLES_1_RANGE: [0.6, 1.35],
+					AMP_1_RANGE: [0.62, 0.95],
+
+					// Extra super-wide variation layer (adds uniqueness per build, stays moundy)
+					CYCLES_VARIATION_RANGE: [0.18, 0.45],
+					AMP_VARIATION_RANGE: [0.12, 0.28],
+
+					// Soft noise (adds organic variation without jaggies)
+					NOISE_AMOUNT_RANGE: [0.03, 0.1],
+					NOISE_SCALE_X: 0.06,
+
+					MAX_FLAT_RUN_BLOCKS: 30,
+
+					// Keep rounded but not identical
+					SMOOTHING_PASSES: 1,
+				},
+
+				// Interaction (desktop only)
+				INTERACTION: {
+					MOVE_THRESHOLD_PX: 2,
+					IGNORE_FIRST_SAMPLE: true,
+					ERASE_DURATION_MS: 0, // 0 = instant off; >0 ramps to off over ms
+					OFF_HOLD_MS: 600,
+				},
+
+				// Tablet/mobile animation (non-interactive)
+				ANIMATION: {
+					ENABLED: true,
+					DIRECTION: "left", // ✅ right-to-left
+					BLOCKS_PER_SECOND: 1, // 1 block per 1s
+				},
+
+				// Responsive
+				RESIZE_DEBOUNCE_MS: 140,
+			};
+
+			// =========================================================
+			// Logging
+			// =========================================================
+			const log = (...a) => CONTROLS.DEBUG_LOGS && console.log("[PixelDivider]", ...a);
+			const warn = (...a) => CONTROLS.DEBUG_LOGS && console.warn("[PixelDivider]", ...a);
+
+			// =========================================================
+			// Guards
+			// =========================================================
+			if (typeof window.p5 === "undefined") {
+				warn("p5.js not found. Load p5 before this script.");
+				return;
 			}
+			log("p5.js loaded ✅");
 
-			// mobile
-			if (window.matchMedia("(max-width: 767px)").matches) {
-				settings.pixelSize = baseSettings.pixelSize * 0.8;
-				settings.blobRadius = baseSettings.blobRadius * 0.28;
-				settings.threshold = 1.2;
-				settings.speed = 1.2;
-				settings.mouseStrength = 0.12;
-				settings.mouseRadius = baseSettings.mouseRadius * 0.72;
-				settings.bottomBand = baseSettings.bottomBand * 0.72; // keep it tighter to the bottom on small screens
+			const hostEl = document.querySelector(CONTROLS.HOST_SELECTOR);
+			if (!hostEl) {
+				warn(`Canvas host not found: ${CONTROLS.HOST_SELECTOR}`);
+				return;
 			}
+			log("Canvas host found ✅", hostEl);
 
-			// tiny phones
-			if (window.matchMedia("(max-width: 479px)").matches) {
-				settings.pixelSize = baseSettings.pixelSize * 0.64;
-			}
-		}
+			// =========================================================
+			// Utilities
+			// =========================================================
+			const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-		// ====== INTERNALS ======
-		let w = 0,
-			h = 0,
-			dpr = 1;
-		let cols = 0,
-			rows = 0;
-		const blobs = [];
-		const mouse = {
-			x: -9999,
-			y: -9999, // current
-			tx: -9999,
-			ty: -9999, // target
-			alpha: 0, // 0..1 (influence on/off)
-			targetAlpha: 0,
-		};
+			const remToPx = (rem) => {
+				const rootFont = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+				return rem * rootFont;
+			};
 
-		function rand(min, max) {
-			return min + Math.random() * (max - min);
-		}
+			const getCharcoal = () =>
+				getComputedStyle(document.documentElement).getPropertyValue("--charcoal").trim() ||
+				"#2b2b2b";
 
-		function resize() {
-			applyResponsiveSettings();
+			const enforceMaxRun = (arr, maxRun, maxH, minH) => {
+				if (!arr.length) return;
+				let runVal = arr[0];
+				let runLen = 1;
 
-			const rect = wrap.getBoundingClientRect();
-			dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-			w = Math.floor(rect.width);
-			h = Math.floor(rect.height);
-			const bandTop = h * (1 - settings.bottomBand);
-
-			canvas.width = Math.floor(w * dpr);
-			canvas.height = Math.floor(h * dpr);
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-			cols = Math.ceil(w / settings.pixelSize);
-			rows = Math.ceil(h / settings.pixelSize);
-
-			// init blobs once
-			if (!blobs.length) {
-				for (let i = 0; i < settings.blobCount; i++) {
-					blobs.push({
-						x: rand(0, w),
-						y: rand(bandTop, h),
-						vx: rand(-1, 1),
-						vy: rand(-0.6, 0.6),
-						phase: rand(0, Math.PI * 2),
-					});
-				}
-			}
-		}
-
-		function update(dt) {
-			const s = settings.speed;
-			const bandTop = h * (1 - settings.bottomBand);
-			const bandBottom = h * 1.15; // allow a bit below so it “merges” into next section
-
-			for (const b of blobs) {
-				b.phase += dt * 0.8;
-
-				// gentle noisy drift (no library)
-				b.vx += Math.sin(b.phase) * 0.02;
-				b.vy += Math.cos(b.phase * 0.9) * 0.02;
-
-				b.x += b.vx * s * 60 * dt;
-				b.y += b.vy * s * 60 * dt;
-
-				// keep in bounds with soft bounce
-				if (b.x < -w * 0.1) {
-					b.x = -w * 0.1;
-					b.vx *= -0.9;
-				}
-				if (b.x > w * 1.1) {
-					b.x = w * 1.1;
-					b.vx *= -0.9;
-				}
-				if (b.y < -h * 0.2) {
-					b.y = -h * 0.2;
-					b.vy *= -0.9;
-				}
-				if (b.y > h * 1.2) {
-					b.y = h * 1.2;
-					b.vy *= -0.9;
-				}
-
-				if (b.y < bandTop) {
-					b.y = bandTop;
-					b.vy = Math.abs(b.vy) * 0.9;
-				}
-				if (b.y > bandBottom) {
-					b.y = bandBottom;
-					b.vy = -Math.abs(b.vy) * 0.9;
-				}
-
-				// mouse interaction: repel a bit
-				if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
-					const dx = b.x - mouse.x;
-					const dy = b.y - mouse.y;
-					const dist = Math.hypot(dx, dy);
-					const r = settings.mouseRadius;
-					if (dist < r && dist > 0.001) {
-						const force = (1 - dist / r) * 0.08 * settings.mouseStrength * mouse.alpha;
-
-						b.vx += (dx / dist) * force;
-						b.vy += (dy / dist) * force;
+				for (let i = 1; i < arr.length; i++) {
+					if (arr[i] === runVal) {
+						runLen++;
+						if (runLen > maxRun) {
+							const dir = i % 2 === 0 ? 1 : -1;
+							arr[i] = clamp(runVal + dir, minH, maxH);
+							runVal = arr[i];
+							runLen = 1;
+						}
+					} else {
+						runVal = arr[i];
+						runLen = 1;
 					}
 				}
+			};
 
-				// damp velocity so it doesn't explode
-				b.vx *= 0.985;
-				b.vy *= 0.985;
-			}
-			// smooth follow + smooth fade
-			const follow = 1 - Math.pow(0.001, dt); // framerate-independent
-			mouse.x += (mouse.tx - mouse.x) * follow;
-			mouse.y += (mouse.ty - mouse.y) * follow;
+			// Smooth integer skyline with moving average; re-quantize to ints
+			const smoothHeights = (heights, passes, minH, maxH) => {
+				if (!passes || passes <= 0) return heights;
 
-			const fade = 1 - Math.pow(0.01, dt); // slower
-			mouse.alpha += (mouse.targetAlpha - mouse.alpha) * fade;
-		}
-
-		function fieldValue(x, y) {
-			// sum r^2 / d^2 style metaball field
-			let v = 0;
-			const r2 = settings.blobRadius * settings.blobRadius;
-
-			for (const b of blobs) {
-				const dx = x - b.x;
-				const dy = y - b.y;
-				const d2 = dx * dx + dy * dy + 0.0001;
-				v += r2 / d2;
-			}
-
-			// add a "mouse blob" to pull the surface toward cursor
-			if (mouse.alpha > 0.001 && settings.mouseStrength > 0) {
-				const dx = x - mouse.x;
-				const dy = y - mouse.y;
-				const d2 = dx * dx + dy * dy + 0.0001;
-				const mr2 =
-					settings.mouseRadius * settings.mouseRadius * settings.mouseStrength * mouse.alpha;
-				v += mr2 / d2;
-			}
-
-			return v;
-		}
-
-		function render() {
-			ctx.clearRect(0, 0, w, h);
-			ctx.fillStyle = settings.color;
-
-			const p = settings.pixelSize;
-
-			for (let gy = 0; gy < rows; gy++) {
-				const y = gy * p + p * 0.5;
-				for (let gx = 0; gx < cols; gx++) {
-					const x = gx * p + p * 0.5;
-
-					if (fieldValue(x, y) > settings.threshold) {
-						ctx.fillRect(gx * p, gy * p, p, p);
+				let arr = heights.slice();
+				for (let p = 0; p < passes; p++) {
+					const next = arr.slice();
+					for (let i = 0; i < arr.length; i++) {
+						const a = arr[(i - 1 + arr.length) % arr.length];
+						const b = arr[i];
+						const c = arr[(i + 1) % arr.length];
+						const avg = Math.round((a + b + c) / 3);
+						next[i] = clamp(avg, minH, maxH);
 					}
+					arr = next;
 				}
-			}
-		}
+				return arr;
+			};
 
-		// ====== LOOP ======
-		let last = performance.now();
-		function tick(now) {
-			const dt = Math.min(0.033, (now - last) / 1000);
-			last = now;
+			// =========================================================
+			// Sketch lifecycle
+			// =========================================================
+			let sketchInstance = null;
 
-			update(dt);
-			render();
-			requestAnimationFrame(tick);
-		}
+			const isInteractive = () => window.innerWidth > CONTROLS.DISABLE_INTERACTION_AT_AND_BELOW_PX;
 
-		// ====== EVENTS ======
-		wrap.addEventListener("mousemove", (e) => {
-			const r = wrap.getBoundingClientRect();
-			mouse.tx = e.clientX - r.left;
-			mouse.ty = e.clientY - r.top;
-			mouse.targetAlpha = 1;
-		});
+			const createSketch = () => {
+				if (sketchInstance) {
+					log("Removing existing sketch…");
+					sketchInstance.remove();
+					sketchInstance = null;
+				}
 
-		wrap.addEventListener("mouseleave", () => {
-			mouse.targetAlpha = 0;
-		});
+				const blockPx = Math.max(1, Math.round(remToPx(CONTROLS.BLOCK_SIZE_REM)));
+				const bandHeightPx = blockPx * CONTROLS.BAND_HEIGHT_BLOCKS;
+				hostEl.style.height = `${bandHeightPx}px`;
 
-		window.addEventListener("resize", resize);
+				const rect = hostEl.getBoundingClientRect();
+				const w = Math.max(1, Math.floor(rect.width));
+				const h = Math.max(1, Math.floor(rect.height));
 
-		resize();
-		requestAnimationFrame(tick);
+				const interactive = isInteractive();
+				log(
+					`Canvas ${w}x${h} | block=${blockPx}px | mode=${interactive ? "INTERACTIVE (desktop)" : "ANIMATED (tablet↓)"}`,
+				);
+
+				sketchInstance = new p5((p) => {
+					let cols = 0;
+					const rows = CONTROLS.BAND_HEIGHT_BLOCKS;
+
+					// Displayed wave
+					let heights = [];
+
+					// Base wave for animation shifting (tablet↓)
+					let baseHeights = [];
+
+					// State for interactive erase (desktop)
+					let vis = [];
+					let eraseStartMs = [];
+					let offUntilMs = [];
+
+					// Movement gating (desktop)
+					let ignoreNext = CONTROLS.INTERACTION.IGNORE_FIRST_SAMPLE;
+
+					const rand = (min, max) => p.random(min, max);
+
+					const buildWaveOnce = () => {
+						cols = Math.ceil(p.width / blockPx);
+
+						const minH = CONTROLS.WAVE_MIN_HEIGHT_BLOCKS;
+						const maxH = rows;
+
+						const useMobileWave = !interactive; // tablet↓ uses mobile-friendly wave
+						const W = useMobileWave ? CONTROLS.WAVE_MOBILE : CONTROLS.WAVE_DESKTOP;
+
+						const newHeights = new Array(cols);
+
+						// Random params ONCE per build (important)
+						const phase1 = rand(0, Math.PI * 2);
+						const cycles1 = rand(W.CYCLES_1_RANGE[0], W.CYCLES_1_RANGE[1]);
+						const k1 = (Math.PI * 2 * cycles1) / p.width;
+
+						const a1 = rand(W.AMP_1_RANGE[0], W.AMP_1_RANGE[1]);
+						const nAmt = rand(W.NOISE_AMOUNT_RANGE[0], W.NOISE_AMOUNT_RANGE[1]);
+
+						// Desktop second wave params
+						let phase2 = 0,
+							k2 = 0,
+							a2 = 0;
+						if (!useMobileWave) {
+							phase2 = rand(0, Math.PI * 2);
+							const cycles2 = rand(W.CYCLES_2_RANGE[0], W.CYCLES_2_RANGE[1]);
+							k2 = (Math.PI * 2 * cycles2) / p.width;
+							a2 = rand(W.AMP_2_RANGE[0], W.AMP_2_RANGE[1]);
+						}
+
+						// Mobile variation wave params (super-wide) — ONCE per build
+						let phaseV = 0,
+							kV = 0,
+							aV = 0;
+						if (useMobileWave) {
+							phaseV = rand(0, Math.PI * 2);
+							const cyclesV = rand(W.CYCLES_VARIATION_RANGE[0], W.CYCLES_VARIATION_RANGE[1]);
+							kV = (Math.PI * 2 * cyclesV) / p.width;
+							aV = rand(W.AMP_VARIATION_RANGE[0], W.AMP_VARIATION_RANGE[1]);
+						}
+
+						for (let i = 0; i < cols; i++) {
+							const x = i * blockPx + blockPx * 0.5;
+
+							const s1 = (Math.sin(x * k1 + phase1) + 1) * 0.5; // 0..1
+							let v = s1 * a1;
+
+							if (useMobileWave) {
+								const sV = (Math.sin(x * kV + phaseV) + 1) * 0.5;
+								v += sV * aV;
+							} else {
+								const s2 = (Math.sin(x * k2 + phase2) + 1) * 0.5;
+								v += s2 * a2;
+							}
+
+							// baked-in static noise
+							const n = p.noise(i * W.NOISE_SCALE_X, 101.123);
+							v += (n - 0.5) * 2 * nAmt;
+
+							v = clamp(v, 0, 1);
+
+							const hBlocks = Math.floor(v * rows);
+							newHeights[i] = clamp(hBlocks, minH, maxH);
+						}
+
+						enforceMaxRun(newHeights, W.MAX_FLAT_RUN_BLOCKS, maxH, minH);
+
+						// Optional smoothing on tablet↓ to keep mounds, not jaggies
+						const smoothed =
+							useMobileWave && W.SMOOTHING_PASSES
+								? smoothHeights(newHeights, W.SMOOTHING_PASSES, minH, maxH)
+								: newHeights;
+
+						heights = smoothed.slice();
+						baseHeights = smoothed.slice();
+
+						// Init interactive state grids (only meaningful on desktop)
+						vis = new Array(cols);
+						eraseStartMs = new Array(cols);
+						offUntilMs = new Array(cols);
+						for (let c = 0; c < cols; c++) {
+							vis[c] = new Array(rows).fill(1);
+							eraseStartMs[c] = new Array(rows).fill(null);
+							offUntilMs[c] = new Array(rows).fill(0);
+						}
+
+						log("Wave built ✅", {
+							cols,
+							profile: useMobileWave ? "mobile(mound+variation)" : "desktop(two-wave)",
+						});
+					};
+
+					// Tablet↓ animation: shift baseHeights sideways by a block offset
+					const applyAnimatedOffset = () => {
+						if (interactive) return;
+						if (!CONTROLS.ANIMATION.ENABLED) return;
+
+						const bps = Math.max(0, CONTROLS.ANIMATION.BLOCKS_PER_SECOND);
+						if (bps === 0) return;
+
+						const dir = CONTROLS.ANIMATION.DIRECTION === "left" ? -1 : 1;
+						const offsetBlocks = Math.floor((p.millis() / 1000) * bps) * dir;
+
+						for (let i = 0; i < cols; i++) {
+							const src = (i - offsetBlocks) % cols;
+							const idx = (src + cols) % cols;
+							heights[i] = baseHeights[idx];
+						}
+					};
+
+					// Desktop interaction: erase exactly one cell under cursor on movement
+					const eraseOneCellIfMoving = () => {
+						if (!interactive) return;
+
+						if (p.mouseX < 0 || p.mouseX > p.width || p.mouseY < 0 || p.mouseY > p.height) {
+							ignoreNext = CONTROLS.INTERACTION.IGNORE_FIRST_SAMPLE;
+							return;
+						}
+
+						const dx = p.movedX || 0;
+						const dy = p.movedY || 0;
+						const dist = Math.sqrt(dx * dx + dy * dy);
+
+						if (ignoreNext) {
+							ignoreNext = false;
+							return;
+						}
+
+						if (dist < CONTROLS.INTERACTION.MOVE_THRESHOLD_PX) return;
+
+						const col = clamp(Math.floor(p.mouseX / blockPx), 0, cols - 1);
+
+						const rowFromTop = Math.floor(p.mouseY / blockPx);
+						const rowFromBottom = rows - 1 - rowFromTop;
+						const row = clamp(rowFromBottom, 0, rows - 1);
+
+						if (row >= heights[col]) return;
+
+						const now = p.millis();
+						if (now < offUntilMs[col][row]) return;
+
+						if (CONTROLS.INTERACTION.ERASE_DURATION_MS === 0) {
+							vis[col][row] = 0;
+							eraseStartMs[col][row] = null;
+							offUntilMs[col][row] = now + CONTROLS.INTERACTION.OFF_HOLD_MS;
+							return;
+						}
+
+						if (eraseStartMs[col][row] === null) {
+							eraseStartMs[col][row] = now;
+						}
+					};
+
+					const updateInteractiveBlocks = () => {
+						if (!interactive) return;
+
+						const now = p.millis();
+						const eraseMs = CONTROLS.INTERACTION.ERASE_DURATION_MS;
+
+						for (let c = 0; c < cols; c++) {
+							const colHeight = heights[c];
+
+							for (let r = 0; r < colHeight; r++) {
+								if (now < offUntilMs[c][r]) {
+									vis[c][r] = 0;
+									eraseStartMs[c][r] = null;
+									continue;
+								}
+
+								if (vis[c][r] === 0 && offUntilMs[c][r] !== 0 && now >= offUntilMs[c][r]) {
+									vis[c][r] = 1;
+									offUntilMs[c][r] = 0;
+									eraseStartMs[c][r] = null;
+									continue;
+								}
+
+								const start = eraseStartMs[c][r];
+								if (start !== null && eraseMs > 0) {
+									const t = clamp((now - start) / eraseMs, 0, 1);
+									vis[c][r] = 1 - t;
+
+									if (t >= 1) {
+										vis[c][r] = 0;
+										eraseStartMs[c][r] = null;
+										offUntilMs[c][r] = now + CONTROLS.INTERACTION.OFF_HOLD_MS;
+									}
+								}
+							}
+						}
+					};
+
+					const drawBlocks = () => {
+						const charcoal = getCharcoal();
+						const baseY = p.height;
+
+						p.fill(charcoal);
+
+						for (let c = 0; c < cols; c++) {
+							const x = c * blockPx;
+							const colHeight = heights[c];
+
+							for (let r = 0; r < colHeight; r++) {
+								const a = interactive ? vis[c][r] : 1;
+								if (a <= 0.001) continue;
+
+								const y = baseY - (r + 1) * blockPx;
+
+								p.push();
+								p.drawingContext.globalAlpha = a;
+								p.rect(x, y, blockPx, blockPx);
+								p.pop();
+							}
+						}
+
+						p.drawingContext.globalAlpha = 1;
+					};
+
+					p.setup = () => {
+						const cnv = p.createCanvas(w, h);
+						cnv.parent(hostEl);
+
+						p.pixelDensity(1);
+						p.noStroke();
+						p.clear();
+
+						buildWaveOnce();
+						ignoreNext = CONTROLS.INTERACTION.IGNORE_FIRST_SAMPLE;
+
+						log("Canvas created ✅");
+					};
+
+					p.draw = () => {
+						p.clear();
+
+						applyAnimatedOffset(); // tablet↓ only
+						eraseOneCellIfMoving(); // desktop only
+						updateInteractiveBlocks(); // desktop only
+						drawBlocks();
+					};
+				});
+			};
+
+			// Debounced resize rebuild
+			let resizeTimer = null;
+			const onResize = () => {
+				if (resizeTimer) window.clearTimeout(resizeTimer);
+				resizeTimer = window.setTimeout(() => {
+					log("Resize detected → rebuilding");
+					createSketch();
+				}, CONTROLS.RESIZE_DEBOUNCE_MS);
+			};
+			window.addEventListener("resize", onResize, { passive: true });
+
+			// Boot + debug API
+			createSketch();
+			log("Ready ✅", {
+				interactionDisabledAtAndBelow: CONTROLS.DISABLE_INTERACTION_AT_AND_BELOW_PX,
+				tabletAnimationDirection: CONTROLS.ANIMATION.DIRECTION,
+				tabletAnimationBlocksPerSecond: CONTROLS.ANIMATION.BLOCKS_PER_SECOND,
+			});
+
+			window.PixelDivider = {
+				rebuild: () => {
+					log("Manual rebuild requested");
+					createSketch();
+				},
+				controls: CONTROLS,
+			};
+		})();
 	}
 
 	function formButtonProxySubmit() {
@@ -1046,7 +1517,8 @@ function main() {
 	randomImgSrc();
 	buttonHover();
 	navOpen();
-	pixelEdgeEffect();
+	// pixelEdgeEffect();
+	newPixelEffect();
 	formButtonProxySubmit();
 	customSelect();
 	faq();
