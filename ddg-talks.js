@@ -1326,6 +1326,12 @@ function main() {
 
 		if (!scroller || !sticky || !imgsWrap || !items.length) return;
 
+		// for testing purposes, remove all items except first N
+		// const MAX_ITEMS = 15;
+		// items.forEach((el, i) => {
+		// 	if (i >= MAX_ITEMS) el.remove();
+		// });
+
 		// --- cleanup: kill old ST + ticker fn (prevents stacking) ---
 		if (scroller._impactST) {
 			scroller._impactST.kill();
@@ -1411,7 +1417,9 @@ function main() {
 		const leadIn = () => vh() * 0.25;
 		const tailOut = () => vh() * 0;
 
-		const totalScrollPx = () => leadIn() + (items.length - 1) * stepPx() + winPx() + tailOut();
+		const totalScrollPx = () =>
+			leadIn() + (items.length - Math.min(4, items.length)) * stepPx() + winPx() + tailOut(); //
+		console.log("Impact gallery total scroll px:", totalScrollPx());
 
 		const setScrollerHeight = () => {
 			const total = totalScrollPx();
