@@ -524,8 +524,9 @@ function main() {
 			};
 
 			const getCharcoal = () =>
-				getComputedStyle(document.documentElement).getPropertyValue("--charcoal").trim() ||
-				"#2b2b2b";
+				getComputedStyle(document.documentElement)
+					.getPropertyValue("--_color---grey--dark")
+					.trim() || "#2c2c2c";
 
 			const enforceMaxRun = (arr, maxRun, maxH, minH) => {
 				if (!arr.length) return;
@@ -1408,7 +1409,7 @@ function main() {
 		const stepPx = () => vh() * 0.35;
 		const winPx = () => vh() * 1.5;
 		const leadIn = () => vh() * 0.25;
-		const tailOut = () => vh() * 0.25;
+		const tailOut = () => vh() * 0;
 
 		const totalScrollPx = () => leadIn() + (items.length - 1) * stepPx() + winPx() + tailOut();
 
