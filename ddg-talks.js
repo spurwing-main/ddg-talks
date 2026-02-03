@@ -1504,7 +1504,7 @@ function main() {
 		// --- ScrollTrigger (raw) ---
 		const st = ScrollTrigger.create({
 			trigger: scroller,
-			start: "top top",
+			start: "top 95%",
 			end: () => "+=" + totalScrollPx(),
 			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
 			invalidateOnRefresh: true,
