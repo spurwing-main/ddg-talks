@@ -571,6 +571,29 @@ function main() {
 			// Sketch lifecycle
 			// =========================================================
 			let sketchInstance = null;
+			let visibilityObserver = null;
+
+			const attachVisibilityObserver = () => {
+				if (!("IntersectionObserver" in window)) return;
+				if (visibilityObserver) visibilityObserver.disconnect();
+
+				visibilityObserver = new IntersectionObserver(
+					(entries) => {
+						const entry = entries && entries[0];
+						if (!entry || !sketchInstance) return;
+
+						if (entry.isIntersecting) sketchInstance.loop();
+						else sketchInstance.noLoop();
+					},
+					{
+						root: null,
+						threshold: 0,
+						rootMargin: "200px 0px 200px 0px",
+					},
+				);
+
+				visibilityObserver.observe(hostEl);
+			};
 
 			const isInteractive = () => window.innerWidth > CONTROLS.DISABLE_INTERACTION_AT_AND_BELOW_PX;
 
@@ -854,18 +877,43 @@ function main() {
 						drawBlocks();
 					};
 				});
+
+				attachVisibilityObserver();
 			};
 
 			// Debounced resize rebuild
+			// iOS Safari can emit resize events while scrolling (address bar expand/collapse).
+			// Rebuild only when width or DPR meaningfully changes.
 			let resizeTimer = null;
+			let lastViewportW = window.innerWidth;
+			let lastDpr = window.devicePixelRatio || 1;
+
 			const onResize = () => {
+				const vw = window.innerWidth;
+				const dpr = window.devicePixelRatio || 1;
+
+				const widthChanged = Math.abs(vw - lastViewportW) >= 2;
+				const dprChanged = Math.abs(dpr - lastDpr) >= 0.1;
+				if (!widthChanged && !dprChanged) return;
+
+				lastViewportW = vw;
+				lastDpr = dpr;
+
 				if (resizeTimer) window.clearTimeout(resizeTimer);
 				resizeTimer = window.setTimeout(() => {
-					log("Resize detected → rebuilding");
+					log("Resize detected (width/DPR) → rebuilding");
 					createSketch();
 				}, CONTROLS.RESIZE_DEBOUNCE_MS);
 			};
 			window.addEventListener("resize", onResize, { passive: true });
+			window.addEventListener(
+				"orientationchange",
+				() => {
+					log("Orientation change → rebuilding");
+					createSketch();
+				},
+				{ passive: true },
+			);
 
 			// Boot + debug API
 			createSketch();
