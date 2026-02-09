@@ -1295,10 +1295,13 @@ function main() {
 
 		const titles = Array.from(document.querySelectorAll(".c-cards h2.section-title"));
 		if (!titles.length) return;
+		const endCircle = document.querySelector(".timeline_circle-wrap.is-end .timeline_circle");
 
 		const centres = Array.from(document.querySelectorAll(".timeline_center, .timeline_centre"));
 		const lastCentre = centres[centres.length - 1];
 		if (!lastCentre) return;
+
+		if (endCircle) gsap.set(endCircle, { backgroundColor: "#c5c5c5" });
 
 		const tween = gsap.to(titles, {
 			color: "#9887ff",
@@ -1306,12 +1309,26 @@ function main() {
 			ease: "power2.out",
 			paused: true,
 		});
+		const endCircleTween = endCircle
+			? gsap.to(endCircle, {
+					backgroundColor: "#9887ff",
+					duration: 0.75,
+					ease: "power2.out",
+					paused: true,
+				})
+			: null;
 
 		ScrollTrigger.create({
 			trigger: lastCentre,
 			start: "bottom center",
-			onEnter: () => tween.play(),
-			onLeaveBack: () => tween.reverse(),
+			onEnter: () => {
+				tween.play();
+				if (endCircleTween) endCircleTween.play();
+			},
+			onLeaveBack: () => {
+				tween.reverse();
+				if (endCircleTween) endCircleTween.reverse();
+			},
 		});
 	}
 
