@@ -1534,7 +1534,11 @@ function main() {
 	initImpactGallery();
 	if (!window._impactGalleryResizeBound) {
 		window._impactGalleryResizeBound = true;
-		window.addEventListener("resize", debounce(initImpactGallery, 250));
+		window.addEventListener(
+			"orientationchange",
+			() => initImpactGallery(),
+			{ passive: true },
+		);
 	}
 
 	if ("requestIdleCallback" in window) {
