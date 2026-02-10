@@ -1404,8 +1404,9 @@ function main() {
 
 		const clamp01 = gsap.utils.clamp(0, 1);
 
-		// --- TIMING MODEL (same across devices; derived from viewport) ---
-		const vh = () => window.innerHeight;
+			// --- TIMING MODEL (same across devices; derived from viewport) ---
+			const vh = () => window.innerHeight;
+			const stickyTravelPx = () => vh() * 0.25;
 
 		const stepPx = () => vh() * 0.35;
 		const winPx = () => vh() * 1.35;
@@ -1491,13 +1492,13 @@ function main() {
 		}
 
 		// --- ScrollTrigger (raw) ---
-		const st = ScrollTrigger.create({
-			trigger: scroller,
-			start: "top top",
-			end: "top -5%",
-			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
-			invalidateOnRefresh: true,
-		});
+			const st = ScrollTrigger.create({
+				trigger: scroller,
+				start: "top top",
+				end: () => `+=${stickyTravelPx()}`,
+				scrub: false, // IMPORTANT: manual smoothing handles “scrub”
+				invalidateOnRefresh: true,
+			});
 		scroller._impactST = st;
 
 		// --- manual scrub via ticker (store fn so we can remove it) ---
