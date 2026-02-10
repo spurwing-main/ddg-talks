@@ -1,4 +1,12 @@
 function main() {
+	function debounce(fn, waitMs = 0) {
+		let t = null;
+		return (...args) => {
+			if (t) window.clearTimeout(t);
+			t = window.setTimeout(() => fn(...args), waitMs);
+		};
+	}
+
 	function buttonHover() {
 		if (typeof gsap === "undefined") return;
 
@@ -1068,44 +1076,61 @@ function main() {
 		}
 	}
 
-	function cards() {
-		const cards = document.querySelectorAll(".card");
+		function cards() {
+			const cards = document.querySelectorAll(".card");
 
-		cards.forEach((card, index) => {
-			const isLast = index === cards.length - 1;
-			const cardInner = card.querySelector(".card_inner");
-			const cardContent = card.querySelector(".card_content");
+			cards.forEach((card, index) => {
+				const isLast = index === cards.length - 1;
+				const cardInner = card.querySelector(".card_inner");
+				const cardContent = card.querySelector(".card_content");
+				if (!cardInner || !cardContent) return;
+				const basePinDuration = () => window.innerHeight;
+				const overflowY = () => Math.max(0, cardContent.scrollHeight - cardInner.clientHeight);
+				const totalPinDuration = () => basePinDuration() + overflowY();
 
-			if (!isLast) {
-				gsap.to(cardContent, {
-					rotationZ: (Math.random() - 0.5) * 10,
-					scale: 0.7,
-					rotationX: 40,
-					ease: "power1.in",
-					scrollTrigger: {
-						pin: cardInner,
-						trigger: card,
-						start: "top top",
-						end: "+=" + window.innerHeight,
-						scrub: true,
-					},
-				});
+				if (!isLast) {
+					gsap.to(cardContent, {
+						rotationZ: (Math.random() - 0.5) * 10,
+						scale: 0.7,
+						rotationX: 40,
+						ease: "power1.in",
+						scrollTrigger: {
+							pin: cardInner,
+							trigger: card,
+							start: "top top",
+							end: () => `+=${totalPinDuration()}`,
+							scrub: true,
+							invalidateOnRefresh: true,
+						},
+					});
 
-				const pinDuration = window.innerHeight;
+					// If content is taller than the card viewport, scroll it upward during the pin.
+					gsap.to(cardContent, {
+						y: () => -overflowY(),
+						ease: "none",
+						scrollTrigger: {
+							trigger: card,
+							start: "top top",
+							end: () => `+=${totalPinDuration()}`,
+							scrub: true,
+							invalidateOnRefresh: true,
+						},
+					});
 
-				gsap.to(cardContent, {
-					autoAlpha: 0,
-					ease: "power1.inOut",
-					scrollTrigger: {
-						trigger: card,
-						start: `top+=${pinDuration * 0.75} top`,
-						end: `top+=${pinDuration} top`,
-						scrub: true,
-					},
-				});
-			}
-		});
-	}
+					gsap.to(cardContent, {
+						autoAlpha: 0,
+						ease: "power1.inOut",
+						scrollTrigger: {
+							trigger: card,
+							start: () => `top+=${totalPinDuration() * 0.75} top`,
+							end: () => `top+=${totalPinDuration()} top`,
+							scrub: true,
+							invalidateOnRefresh: true,
+						},
+					});
+				}
+			});
+		}
 
 	function faq() {
 		const items = Array.from(document.querySelectorAll(".faq_item"));
@@ -1333,14 +1358,22 @@ function main() {
 	}
 
 	function initImpactGallery() {
+		if (typeof gsap === "undefined" || typeof ScrollTrigger === "undefined") return;
+
 		const section = document.querySelector(".c-impact");
 		const scroller = section?.querySelector(".impact_scroll");
 		const sticky = section?.querySelector(".impact_sticky-content");
 		const imgsWrap = section?.querySelector(".impact_imgs");
-		const items = gsap.utils.toArray(".c-impact-img", imgsWrap);
-		const isMobile = () => window.innerWidth <= 767;
+		let items = gsap.utils.toArray(".c-impact-img", imgsWrap);
 
 		if (!scroller || !sticky || !imgsWrap || !items.length) return;
+
+		// Only support 3 images. If more exist, remove the extras.
+		const MAX_ITEMS = 3;
+		if (items.length > MAX_ITEMS) {
+			items.slice(MAX_ITEMS).forEach((el) => el.remove());
+			items = items.slice(0, MAX_ITEMS);
+		}
 
 		// for testing purposes, remove all items except first N
 		// const MAX_ITEMS = 15;
@@ -1363,106 +1396,56 @@ function main() {
 			.filter((st) => st.trigger === scroller)
 			.forEach((st) => st.kill());
 
-		// Mobile: do not run any of the Impact animation machinery
-		if (isMobile()) {
-			// Avoid a huge scroll-only section on mobile
-			scroller.style.height = "";
-
-			// Hide images on mobile (previous behavior), and clear any 3D styles
-			imgsWrap.style.visibility = "";
-			imgsWrap.style.transformStyle = "";
-			sticky.style.perspective = "";
-
-			items.forEach((el) => {
-				gsap.set(el, {
-					opacity: 0,
-					clearProps:
-						"filter,transform,willChange,backfaceVisibility,transformStyle,z,left,top,xPercent,yPercent",
-				});
-			});
-			return;
-		}
-
 		imgsWrap.style.visibility = "hidden";
 
-		// perspective: good
-		sticky.style.perspective = `${Math.round(window.innerWidth * 0.9)}px`;
+		// perspective / 3D settings (responsive unit)
+		sticky.style.perspective = "90vw";
 		imgsWrap.style.transformStyle = "preserve-3d";
 
 		const clamp01 = gsap.utils.clamp(0, 1);
 
-		function biasedPosition(el, { sideBias, minGutter, centerExclusion, topPad, bottomPad } = {}) {
-			const vw = window.innerWidth;
-			const rect = el.getBoundingClientRect();
-			const w = rect.width || 260;
-
-			const xMin = minGutter + w * 0.5;
-			const xMax = vw - minGutter - w * 0.5;
-
-			const cx = vw * 0.5;
-			const halfDead = vw * centerExclusion * 0.5;
-
-			const leftBand = [xMin, Math.max(xMin, cx - halfDead)];
-			const rightBand = [Math.min(xMax, cx + halfDead), xMax];
-
-			const pickRight = Math.random() < sideBias;
-			let band = pickRight ? rightBand : leftBand;
-			if (band[1] - band[0] < 20) band = [xMin, xMax];
-
-			const xPx = gsap.utils.random(band[0], band[1], 1);
-			const yPct = gsap.utils.random(topPad, 100 - bottomPad, 1);
-
-			return {
-				left: `${(xPx / vw) * 100}%`,
-				top: `${yPct}%`,
-			};
-		}
-
-		// --- TIMING MODEL ---
+		// --- TIMING MODEL (same across devices; derived from viewport) ---
 		const vh = () => window.innerHeight;
 
 		const stepPx = () => vh() * 0.35;
-		const winPx = () => vh() * 1.5;
-		const leadIn = () => vh() * 0.25;
-		const tailOut = () => vh() * 0;
+		const winPx = () => vh() * 1.35;
+		const leadIn = () => vh() * 0.2;
+		const tailOut = () => 0;
 
-		const totalScrollPx = () =>
-			leadIn() + (items.length - Math.min(4, items.length)) * stepPx() + winPx() + tailOut(); //
-		console.log("Impact gallery total scroll px:", totalScrollPx());
+		const blurMax = 20;
+		const zStartPx = -0.45 * vh();
+		const zRangePx = 0.9 * vh();
 
-		const setScrollerHeight = () => {
-			const total = totalScrollPx();
-			scroller.style.height = `${Math.ceil(((total + vh()) / vh()) * 100)}vh`;
-		};
-		if (!isMobile()) setScrollerHeight();
+		// Timeline length (in px units) that we map ScrollTrigger progress onto.
+		// Note: we do NOT set scroll height here; CSS controls the scroller height.
+		const timelinePx = () => leadIn() + (items.length - 1) * stepPx() + winPx() + tailOut();
 
-		// --- layout + baseline (no transform strings) ---
-		items.forEach((el) => {
-			const pos = biasedPosition(el, {
-				sideBias: 0.5,
-				minGutter: 32,
-				centerExclusion: 0.35,
-				topPad: 50,
-				bottomPad: 75,
-			});
+		// --- layout + baseline (fixed positions; no randomness) ---
+		const POSITIONS = [
+			{ left: "30%", top: "40%" },
+			{ left: "55%", top: "55%" },
+			{ left: "70%", top: "38%" },
+		];
 
+		items.forEach((el, idx) => {
+			const pos = POSITIONS[idx] || POSITIONS[0];
 			gsap.set(el, {
 				left: pos.left,
 				top: pos.top,
 				xPercent: -50,
 				yPercent: -50,
 				opacity: 0,
-				filter: "blur(20px)",
+				filter: `blur(${blurMax}px)`,
 				transformStyle: "preserve-3d",
 				backfaceVisibility: "hidden",
 				willChange: "transform, opacity, filter",
-				z: -300, // in vh units we’ll treat as vh later; you can switch to px if you want
+				z: zStartPx,
 			});
 		});
 
 		// --- quickSetters (components, NOT full transform) ---
 		const setters = items.map((el) => ({
-			z: gsap.quickSetter(el, "z", "vh"), // sets translateZ(...) in vh units
+			z: gsap.quickSetter(el, "z", "px"),
 			opacity: gsap.quickSetter(el, "opacity"),
 			blur: (px) => (el.style.filter = `blur(${px}px)`),
 		}));
@@ -1470,6 +1453,8 @@ function main() {
 		function render(t) {
 			const fadeInP = 0.35;
 			const fadeOutP = 0.25;
+			const edgeEps = 1e-4;
+			const alphaEps = 0.001;
 
 			items.forEach((el, i) => {
 				const start = leadIn() + i * stepPx();
@@ -1477,10 +1462,10 @@ function main() {
 				const p = clamp01(u);
 
 				// outside its window -> hard hidden
-				if (u <= 0 || u >= 1) {
+				if (u <= edgeEps || u >= 1 - edgeEps) {
 					setters[i].opacity(0);
-					setters[i].blur(20);
-					setters[i].z(-300);
+					setters[i].blur(blurMax);
+					setters[i].z(zStartPx);
 					return;
 				}
 
@@ -1489,12 +1474,19 @@ function main() {
 				else if (p > 1 - fadeOutP) alpha = (1 - p) / fadeOutP;
 				else alpha = 1;
 
-				const blurPx = 20 * (1 - alpha);
-				const zVh = -300 + 500 * p;
+				if (alpha <= alphaEps) {
+					setters[i].opacity(0);
+					setters[i].blur(blurMax);
+					setters[i].z(zStartPx);
+					return;
+				}
+
+				const blurPx = blurMax * (1 - alpha);
+				const zPx = zStartPx + zRangePx * p;
 
 				setters[i].opacity(alpha);
 				setters[i].blur(blurPx);
-				setters[i].z(zVh);
+				setters[i].z(zPx);
 			});
 		}
 
@@ -1502,10 +1494,9 @@ function main() {
 		const st = ScrollTrigger.create({
 			trigger: scroller,
 			start: "top top",
-			end: () => "+=" + totalScrollPx(),
+			end: "top -5%",
 			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
 			invalidateOnRefresh: true,
-			onRefresh: setScrollerHeight,
 		});
 		scroller._impactST = st;
 
@@ -1515,16 +1506,14 @@ function main() {
 
 		scroller._impactTickerFn = () => {
 			if (!scroller._impactST) return;
-			if (isMobile()) {
-				items.forEach((el) => (el.style.opacity = "0"));
-				return;
-			}
-
-			const rawT = scroller._impactST.scroll() - scroller._impactST.start;
+			const rawP = clamp01(scroller._impactST.progress);
+			const totalT = timelinePx();
+			const rawT = rawP * totalT;
 
 			const dt = gsap.ticker.deltaRatio() / 60;
 			const k = 1 - Math.exp(-dt / scrubSeconds);
 			smoothedT += (rawT - smoothedT) * k;
+			smoothedT = Math.max(0, Math.min(totalT, smoothedT));
 
 			render(smoothedT);
 		};
@@ -1540,16 +1529,12 @@ function main() {
 	// Run after load so image sizes exist for safe positioning
 	window.addEventListener("load", initImpactGallery);
 
-	function randomImgSrc() {
-		const impactImgs = document.querySelectorAll(".c-impact-img > img");
-		impactImgs.forEach((img, index) => {
-			img.src = `https://picsum.photos/600/600.webp?random=${Math.random() * 1000 + index}`;
-		});
-	}
-
 	// run once, and again on resize (debounced)
 	initImpactGallery();
-	// window.addEventListener("resize", gsap.utils.debounce(initImpactGallery, 250));
+	if (!window._impactGalleryResizeBound) {
+		window._impactGalleryResizeBound = true;
+		window.addEventListener("resize", debounce(initImpactGallery, 250));
+	}
 
 	if ("requestIdleCallback" in window) {
 		requestIdleCallback(cards);
@@ -1559,7 +1544,6 @@ function main() {
 
 	// call functions
 
-	randomImgSrc();
 	buttonHover();
 	navOpen();
 	// pixelEdgeEffect();
