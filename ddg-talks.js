@@ -1311,11 +1311,11 @@ function main() {
 		});
 		const endCircleTween = endCircle
 			? gsap.to(endCircle, {
-					backgroundColor: "#9887ff",
-					duration: 0.75,
-					ease: "power2.out",
-					paused: true,
-				})
+				backgroundColor: "#9887ff",
+				duration: 0.75,
+				ease: "power2.out",
+				paused: true,
+			})
 			: null;
 
 		ScrollTrigger.create({
@@ -1336,7 +1336,6 @@ function main() {
 		const section = document.querySelector(".c-impact");
 		const scroller = section?.querySelector(".impact_scroll");
 		const sticky = section?.querySelector(".impact_sticky-content");
-		const content = section?.querySelector(".impact_content");
 		const imgsWrap = section?.querySelector(".impact_imgs");
 		const items = gsap.utils.toArray(".c-impact-img", imgsWrap);
 		const isMobile = () => window.innerWidth <= 767;
@@ -1354,10 +1353,6 @@ function main() {
 			scroller._impactST.kill();
 			scroller._impactST = null;
 		}
-		if (scroller._impactContentTween) {
-			scroller._impactContentTween.kill();
-			scroller._impactContentTween = null;
-		}
 		if (scroller._impactTickerFn) {
 			gsap.ticker.remove(scroller._impactTickerFn);
 			scroller._impactTickerFn = null;
@@ -1372,9 +1367,6 @@ function main() {
 		if (isMobile()) {
 			// Avoid a huge scroll-only section on mobile
 			scroller.style.height = "";
-
-			// Content should just be visible
-			if (content) gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
 
 			// Hide images on mobile (previous behavior), and clear any 3D styles
 			imgsWrap.style.visibility = "";
@@ -1444,27 +1436,6 @@ function main() {
 		};
 		if (!isMobile()) setScrollerHeight();
 
-		// --- impact content fade-in (scrubbed) ---
-		if (content) {
-			if (isMobile()) {
-				gsap.set(content, { opacity: 1, y: 0, clearProps: "willChange" });
-			} else {
-				gsap.set(content, { opacity: 0, y: 10, willChange: "opacity, transform" });
-				scroller._impactContentTween = gsap.to(content, {
-					opacity: 1,
-					y: 0,
-					ease: "none",
-					scrollTrigger: {
-						trigger: scroller,
-						start: () => `top+=${Math.round(totalScrollPx() * 0.25)} top`,
-						end: () => `top+=${Math.round(totalScrollPx() * 0.45)} top`,
-						scrub: true,
-						invalidateOnRefresh: true,
-					},
-				});
-			}
-		}
-
 		// --- layout + baseline (no transform strings) ---
 		items.forEach((el) => {
 			const pos = biasedPosition(el, {
@@ -1530,7 +1501,7 @@ function main() {
 		// --- ScrollTrigger (raw) ---
 		const st = ScrollTrigger.create({
 			trigger: scroller,
-			start: "top 95%",
+			start: "top top",
 			end: () => "+=" + totalScrollPx(),
 			scrub: false, // IMPORTANT: manual smoothing handles “scrub”
 			invalidateOnRefresh: true,
