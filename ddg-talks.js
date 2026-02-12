@@ -1410,7 +1410,8 @@ function main() {
 
 		const stepPx = () => vh() * 0.35;
 		const winPx = () => vh() * 1.35;
-		const leadIn = () => vh() * 0.2;
+		// Delay first impact reveal slightly after the section pins.
+		const leadIn = () => vh() * 0.28;
 		const tailOut = () => 0;
 
 		const blurMax = 20;
